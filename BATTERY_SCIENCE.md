@@ -1,5 +1,5 @@
 # Battery Science & Electrochemical Foundations
-## Lithium-Ion Degradation, Coulomb Counting & Thermodynamics
+## Lithium-Ion Degradation, Coulomb Counting, USB Thermodynamics & Wireless Physics
 
 This document provides the electrochemical and thermodynamic foundation for **Charge Science**, specifically calibrated for modern smartphone lithium-ion / lithium-polymer pouch cells (reference: **Google Pixel 8a**, 4,492 mAh nominal capacity, Maxim MAX77759 companion PMIC / ModelGauge m5 architecture).
 
@@ -30,7 +30,7 @@ In Maxim ModelGauge m5 architectures:
 2. **`FullCapRep` (Reported Full Capacity, exposed via sysfs `charge_full`):** Dynamically derated capacity taking into account the cell's current operating temperature, internal impedance growth ($R_{\text{int}}$), and recent discharge load patterns.
 
 **Crucial Scientific Distinction:**
-On a Pixel 8a with 782 cycles, reading `charge_full = 3,998 mAh` versus nominal `4,492 mAh` does **not** simply mean the battery has exactly $89\%$ State of Health. If sampled at elevated temperature ($>35^\circ\text{C}$) or after high-drain usage, `FullCapRep` shifts dynamically. Presenting the raw ratio as an immutable health metric is misleading.
+On a Pixel 8a with 782 cycles, reading `charge_full = 3,998 mAh` versus nominal `4,492 mAh` does **not** mean the battery has an immutable $89\%$ State of Health. If sampled at elevated temperature ($>35^\circ\text{C}$) or after high-drain usage, `FullCapRep` shifts dynamically. Presenting the raw ratio as an immutable health metric is misleading.
 
 ### 1.3 Userspace Power Integration (Trapezoidal Rule)
 Instantaneous power $P(t) = V_{\text{term}}(t) \cdot I_{\text{batt}}(t)$. Because Android system wakeups and CPU scheduling produce non-uniform sampling intervals $\Delta t_i = t_{i+1} - t_i$, taking a simple arithmetic mean of sampled power induces up to $18\%$ skew during fast-charging taper phases.
@@ -43,58 +43,69 @@ $$E_{\text{net}} = \int_{t_0}^{t_N} P(\tau) \, d\tau \approx \sum_{i=0}^{N-1} \f
 
 ---
 
-## 2. State of Health (SOH) & Degradation Mechanics
+## 2. Physical Impossibility of Battery-Side Cable Resistance Estimation
 
-### 2.1 SOH Formulations
-$$\text{SOH}_{\text{Capacity}} = \frac{\text{FCC}(T_{\text{ref}})}{Q_{\text{design}}} \times 100\%$$
+A prevalent pseudoscientific claim in amateur battery tools is calculating USB-C cable resistance from Android `BatteryManager` readings ($R = \Delta V / \Delta I$).
+
+### Mathematical & Circuit Proof of Impossibility:
+Along the physical charging path:
+$$V_{\text{charger}} = V_{\text{bus\_in}} + I_{\text{cable}} \cdot R_{\text{cable}}$$
+$$\implies R_{\text{cable}} = \frac{V_{\text{charger}} - V_{\text{bus\_in}}}{I_{\text{cable}}}$$
+
 Where:
-- $Q_{\text{design}} = 4{,}492\text{ mAh}$ for the Google Pixel 8a.
-- $\text{FCC}(T_{\text{ref}})$ is the Full Charge Capacity at $25^\circ\text{C}$ from $4.45\text{V}$ down to $3.2\text{V}$.
+- $V_{\text{charger}}$: Regulated voltage output at the power brick terminals.
+- $R_{\text{cable}}$: Round-trip loop resistance ($V_{\text{BUS}}$ wire + $\text{GND}$ return wire + contact pins).
+- $V_{\text{bus\_in}}$: Input voltage arriving at the phone's Type-C port.
+- $I_{\text{cable}}$: Current flowing through the cable wire.
 
-End of Life (EOL) for mobile lithium-ion cells is internationally recognized when $\text{FCC} \le 80\% \cdot Q_{\text{design}}$ or internal resistance doubles ($R_{\text{actual}} \ge 2 \cdot R_{\text{fresh}}$).
+### The PMIC Switching Buck Disconnect:
+Modern smartphones (including Google Pixel 8a) use **high-efficiency switching buck converters** (not linear LDO regulators):
+$$(V_{\text{bus\_in}} \cdot I_{\text{cable}}) \cdot \eta_{\text{PMIC}} = (V_{\text{batt}} \cdot I_{\text{batt}}) + P_{\text{sys}}$$
 
-### 2.2 Equivalent Full Cycles (EFC)
-One Equivalent Full Cycle is defined strictly as cumulative discharge throughput divided by design capacity:
-$$N_{\text{EFC}} = \frac{1}{Q_{\text{design}}} \sum |\Delta Q_{\text{discharge}}|$$
+Consequently:
+$$I_{\text{batt}} = I_{\text{cable}} \cdot \left(\frac{V_{\text{bus\_in}}}{V_{\text{batt}}}\right) \cdot \eta_{\text{PMIC}} - \frac{P_{\text{sys}}}{V_{\text{batt}}}$$
 
-Degradation per cycle scales non-linearly with Depth of Discharge (DoD):
-$$\text{Degradation per cycle} \propto (\Delta \text{DoD})^\beta, \quad \beta \approx 1.8 - 2.2$$
+Because $V_{\text{bus\_in}}$ is negotiated at $9.0\text{V}$ and $V_{\text{batt}} \approx 3.8 - 4.45\text{V}$:
+- **$I_{\text{batt}} \ne I_{\text{cable}}$:** A cable current of $2.0\text{A}$ at $9\text{V}$ ($18\text{W}$) yields $\sim 4.1\text{A}$ into the battery cell!
+- $V_{\text{charger}}$ varies dynamically under load due to regulation droop and PPS requests.
+- $V_{\text{bus\_in}}$ is locked behind kernel ADC drivers and is invisible to userspace.
+- Dynamic system load $P_{\text{sys}}$ (CPU, display, modem) fluctuates continuously.
 
-Ten $10\%$ discharge cycles cause significantly less electrochemical damage than a single $100\%$ full deep-discharge cycle.
-
-### 2.3 Primary Degradation Mechanisms
-1. **Solid Electrolyte Interphase (SEI) Growth:** Parasitic reduction of organic solvent molecules at the graphite anode binds active lithium ions ($Li^+$) irreversibly. Follows Arrhenius temperature kinetics:
-   $$k_{\text{SEI}}(T) = A \cdot \exp\left(-\frac{E_a}{R_u T}\right)$$
-   Elevated temperatures ($>35^\circ\text{C}$) combined with high cell potentials ($>4.2\text{V}$) strongly accelerate SEI thickening.
-2. **Lithium Plating:** Occurs when the anode overpotential drops below $0\text{V vs. } Li/Li^+$, causing metallic lithium to deposit on the anode instead of intercalating. Accelerated by fast charging at low temperatures ($<15^\circ\text{C}$) or high C-rates near high SOC.
-3. **Impedance Rise (Ohmic & Charge Transfer):** Surface film growth increases cell internal resistance $R_{\text{int}}$, causing premature low-voltage shutdown under transient CPU/GPU load bursts.
-
----
-
-## 3. Charging Thermodynamics & Throttling
-
-### 3.1 Heat Generation (Bernardi Equation)
-$$\dot{Q}_{\text{cell}} = \underbrace{I^2 R_{\text{int}}}_{\text{Irreversible Joule Heating}} + \underbrace{I \cdot T \cdot \frac{\partial V_{\text{OCV}}}{\partial T}}_{\text{Reversible Entropic Heating}}$$
-
-At an $18\text{W}$ peak charge rate ($I_{\text{cell}} \approx 4\text{A}$, $R_{\text{int}} \approx 35\text{m}\Omega$):
-$$\dot{Q}_{\text{Joule}} = (4\text{A})^2 \times 0.035\Omega = 0.56\text{W}$$
-
-### 3.2 PMIC Heat Dissipation
-Converting USB bus voltage ($9\text{V}$) down to battery rail voltage ($3.8 - 4.45\text{V}$) in the switching buck regulator occurs at $\approx 92\%$ efficiency:
-$$P_{\text{loss, PMIC}} = 18\text{W} \times (1 - 0.92) = 1.44\text{W}$$
-
-**Scientific Reality:** The PMIC generates **$1.44\text{W}$** of concentrated heat—more than **2.5×** the battery's internal Joule heat ($0.56\text{W}$). Because the PMIC is enclosed within the unventilated phone chassis next to the battery pouch, PMIC dissipation is the dominant driver of battery heating during fast charging.
+With **4 dynamic unknowns** and only **2 knowns** ($V_{\text{batt}}, I_{\text{batt}}$), calculating $R_{\text{cable}}$ from userspace battery telemetry is mathematically indeterminate. Charge Science explicitly refuses to produce fabricated resistance metrics without an external inline BLE power meter.
 
 ---
 
-## 4. Session Confidence Scoring Algorithm ($S_{\text{conf}}$)
+## 3. Wireless Charging Thermodynamics (Pixel 8a Qi Baseline)
 
-To prevent presenting noisy, inaccurate capacity estimates, Charge Science computes a session confidence score:
-$$S_{\text{conf}} = 0.40 \cdot C_{\Delta \text{SOC}} + 0.25 \cdot C_{\text{thermal}} + 0.20 \cdot C_{\text{rest}} + 0.15 \cdot C_{\text{quality}}$$
+### 3.1 Hardware Capability
+- **Inductive Receiver Coil:** Standard Qi 1.x Baseline & Extended Power Profile.
+- **Hardware Wattage Ceiling:** **7.5W max**.
+- **Qi2 Magnetic Power Profile (MPP):** Not supported on Pixel 8a. Magnetic cases provide mechanical retention only; electrical negotiation remains standard Qi 7.5W.
+- **Transmitter Wall Power:** Inaccessible from Android framework due to electrical air-gap isolation.
 
-- **$C_{\Delta \text{SOC}}$:** $100$ if $\Delta \text{SOC} \ge 70\%$; scaled linearly from $0$ to $100$ between $10\%$ and $70\%$.
-- **$C_{\text{thermal}}$:** $\max(0, 100 - 15 \cdot \Delta T_{\text{rise}} - 20 \cdot N_{\text{throttle}})$.
-- **$C_{\text{rest}}$:** $100$ if session reached completion ($100\%$ SOC with taper); $50$ if healthy stop above $80\%$; $20$ if interrupted.
-- **$C_{\text{quality}}$:** Percentage of valid 1 Hz telemetry samples captured without sampling dropouts: $\frac{N_{\text{valid}}}{N_{\text{valid}} + N_{\text{missing}}} \times 100$.
+### 3.2 Thermal Load Coefficient ($\Theta$)
+Wireless charging converts power across three lossy stages:
+1. Transmitter AC inverter & coil eddy currents ($\sim 80\%$).
+2. Air-gap magnetic coupling ($k \approx 0.65 - 0.85$).
+3. Phone receiver synchronous rectifier & PMIC buck converter.
 
-**Gating Rule:** Only sessions with $S_{\text{conf}} \ge 80\%$ and $\Delta \text{SOC} \ge 70\%$ are qualified for deep battery health recalculation.
+Because the receiver coil and rectifier sit immediately against the phone's battery pouch, wireless charging produces a much higher thermal rise per stored Joule. Charge Science defines the **Thermal Load Coefficient ($\Theta$)**:
+$$\Theta = \frac{\Delta T_{\text{max}}}{E_{\text{net\_Wh}}} \quad \left[\frac{^\circ\text{C}}{\text{Wh}}\right]$$
+
+On Pixel 8a:
+- **18W Wired USB-PD:** $\Theta \approx 0.4 - 0.7^\circ\text{C}/\text{Wh}$
+- **7.5W Wireless Qi:** $\Theta \approx 1.5 - 2.8^\circ\text{C}/\text{Wh}$ (over **3× higher thermal burden** per Wh stored).
+
+---
+
+## 4. Controlled Charging Session Comparison Principles
+
+Directly comparing two charging sessions without electrochemical controls produces misleading conclusions.
+
+### Required Scientific Controls:
+1. **Starting State of Charge Matching ($|\Delta \text{SOC}_{\text{start}}| \le 15\%$):**
+   Lithium-ion cells follow non-linear Constant Current / Constant Voltage (CC-CV) saturation curves. A session charging from $10\% \to 60\%$ operates almost entirely in full-power CC mode ($15 - 18\text{W}$), whereas a session from $60\% \to 100\%$ operates in CV saturation taper ($12\text{W} \to 2\text{W}$). Declaring Charger A "faster" than Charger B when starting SOCs differ is unscientific.
+2. **Thermal Baseline Matching ($|\Delta T_{\text{start}}| \le 6^\circ\text{C}$):**
+   Pre-existing cell heat triggers Android Thermal HAL throttling earlier, reducing average power independently of charger quality.
+3. **Session Integrity:**
+   Both sessions must be uninterrupted by app force-stops or reboots, with data confidence $S_{\text{conf}} \ge 75\%$.

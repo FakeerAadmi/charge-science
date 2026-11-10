@@ -141,15 +141,13 @@ class BatteryTelemetryCollector(private val context: Context) {
             Float.NaN
         }
 
-        // Protocol inference
-        val protocol = when {
-            plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Qi Wireless (Max 7.5W on 8a)"
-            maxVoltageUv >= 9_000_000 -> "USB Power Delivery (${maxVoltageUv / 1_000_000}V Profile)"
-            maxVoltageUv > 5_000_000 -> "USB Power Delivery (${maxVoltageUv / 1_000_000.0f}V Profile)"
-            plugged == BatteryManager.BATTERY_PLUGGED_AC -> "AC Fast Charger (5V Standard)"
-            plugged == BatteryManager.BATTERY_PLUGGED_USB -> "Standard USB Port (5V)"
-            else -> "Discharging on Battery"
-        }
+        // Protocol classification using rigorous domain classifier
+        val protocolInfo = com.example.chargescience.domain.protocol.ChargingProtocolClassifier.classify(
+            chargeSource = plugged,
+            maxVoltageUv = maxVoltageUv,
+            maxCurrentUa = maxCurrentUa
+        )
+        val protocol = protocolInfo.protocolName
 
         _telemetry.value = BatteryTelemetry(
             timestamp = System.currentTimeMillis(),

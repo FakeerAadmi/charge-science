@@ -47,6 +47,10 @@ fun MainScreen(
     val allSessions by database.chargingSessionDao().getAllSessionsFlow()
         .collectAsStateWithLifecycle(initialValue = emptyList())
 
+    // Observe all saved accessories
+    val allAccessories by database.accessoryProfileDao().getAllAccessoriesFlow()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+
     // If an active session is running, observe its live samples; otherwise, use latest session samples
     val targetSessionId = activeSession?.id ?: allSessions.firstOrNull()?.id
     val liveSamples by remember(targetSessionId) {
@@ -141,11 +145,21 @@ fun MainScreen(
                 )
                 NavDestination.HISTORY -> ChargingHistoryScreen(
                     sessions = allSessions,
+                    accessories = allAccessories,
                     onLoadSessionSamples = { sessionId ->
                         database.telemetrySampleDao().getSamplesForSession(sessionId)
+                    },
+                    onLinkAccessoryToSession = { sessionId, accessoryId ->
+                        database.chargingSessionDao().linkAccessoryToSession(sessionId, accessoryId)
                     }
                 )
-                NavDestination.CHARGER -> ChargerIntelligenceScreen(telemetry = telemetry)
+                NavDestination.CHARGER -> ChargerIntelligenceScreen(
+                    telemetry = telemetry,
+                    accessories = allAccessories,
+                    onSaveAccessory = { accessory ->
+                        database.accessoryProfileDao().insertAccessory(accessory)
+                    }
+                )
                 NavDestination.HEALTH -> BatteryHealthScreen(telemetry = telemetry)
             }
         }

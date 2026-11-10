@@ -35,5 +35,6 @@ data class ChargingSessionEntity(
     val missingSampleCount: Int = 0,
     val confidenceScore: Float = 0f,
     val isCompleted: Boolean = false,
-    val wasInterrupted: Boolean = false // Process killed, crash, or unexpected device reboot
+    val wasInterrupted: Boolean = false, // Process killed, crash, or unexpected device reboot
+    val accessoryId: Long? = null // Associated accessory profile ID (power brick, wireless pad)
 )

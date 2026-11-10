@@ -297,7 +297,8 @@ class ChargingSessionManager(
             missingSampleCount = missingSampleCount,
             confidenceScore = confidence,
             isCompleted = true,
-            wasInterrupted = wasInterrupted
+            wasInterrupted = wasInterrupted,
+            accessoryId = existingSession?.accessoryId
         )
 
         sessionDao.updateSession(finalized)

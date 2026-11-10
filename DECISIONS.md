@@ -48,7 +48,7 @@
 
 ### ADR 006: Foreground Service with `specialUse` Type and Charging-Bound WakeLock
 - **Status:** Accepted
-- **Context:** Android 14+ enforces explicit foreground service types. Android 15 caps `dataSync` to 6 hours per 24 hours. `health` is rejected by Google Play policy for device battery monitoring (restricted to medical/biometric). Furthermore, when the screen turns off during multi-hour charging sessions, the kernel CPU governor suspends userspace threads, causing sampling dropouts.
+- **Context:** Android 14+ enforces explicit foreground service types. Android 15 caps `dataSync` to 6 hours per 24 hours. `health` is rejected by Google Play policy for device battery monitoring. Furthermore, when the screen turns off during multi-hour charging sessions, the kernel CPU governor suspends userspace threads, causing sampling dropouts.
 - **Decision:** Implement `ChargingTelemetryService` with `foregroundServiceType="specialUse"` and manifest property `PROPERTY_SPECIAL_USE_FGS_SUBTYPE="charging_telemetry_recording"`. Acquire `PowerManager.PARTIAL_WAKE_LOCK` strictly while `isCharging == true`, immediately releasing it upon cable detachment.
 - **Consequences:** Continuous 1 Hz telemetry sampling across screen-off charging cycles without violating Android background policies or causing idle battery drain.
 
@@ -59,3 +59,27 @@
 - **Context:** Third-party charting libraries introduce heavy dependencies, view wrappers, and decorative cubic spline smoothing that creates false peaks and hides physical voltage/current steps.
 - **Decision:** Build a custom hardware-accelerated Compose Canvas component (`TelemetryTimeSeriesChart`) with linear piecewise segments, discrete measurement nodes, and dynamic bounds.
 - **Consequences:** High performance, zero extra dependencies, truthful representation of physical sensor readings in light and dark themes.
+
+---
+
+### ADR 008: Controlled Charging Session Comparison Gating
+- **Status:** Accepted
+- **Context:** Uncontrolled comparisons between sessions starting at different battery SOCs (e.g. 10% vs 70%) are scientifically invalid because lithium-ion charging curves are non-linear (Constant Current vs Constant Voltage taper).
+- **Decision:** Implement `ChargingComparisonEngine` with strict validity rules: warn if $|\Delta\text{SOC}_{\text{start}}| > 15\%$ or $|\Delta T_{\text{start}}| > 6^\circ\text{C}$, and categorize comparisons into `HIGH_FIDELITY_CONTROLLED`, `COMPARABLE_WITH_CAVEATS`, or `UNCONTROLLED_MISLEADING`.
+- **Consequences:** Prevents users from drawing false conclusions regarding charger or cable quality.
+
+---
+
+### ADR 009: Strict Scientific Rejection of Battery-Side Cable Resistance Estimation
+- **Status:** Accepted
+- **Context:** Multiple popular battery apps claim to measure USB-C cable resistance by dividing battery voltage changes by battery current. However, because modern smartphones use high-efficiency switching buck converters, $I_{\text{battery}} \ne I_{\text{cable}}$ and $V_{\text{bus}}$ at the charger is unknown.
+- **Decision:** Reject software-only cable resistance calculations. Explicitly label cable resistance as unavailable without external inline hardware, and design an extensible BLE GATT meter interface (FNIRSI FNB58 / TC66C).
+- **Consequences:** Upholds scientific fidelity and prevents publishing fabricated numbers.
+
+---
+
+### ADR 010: Local FileProvider Document Export without Network Permissions
+- **Status:** Accepted
+- **Context:** Users need to export raw telemetry (CSV/JSON) for external laboratory analysis in Python/Excel, but the application must strictly adhere to zero network permissions.
+- **Decision:** Implement `DataExportManager` using Android's native `FileProvider` (`androidx.core.content.FileProvider`) writing to the application's internal cache directory and launching `Intent.ACTION_SEND` with temporary read URI permissions.
+- **Consequences:** Clean, privacy-first local export without requesting `INTERNET` or `WRITE_EXTERNAL_STORAGE` permissions.

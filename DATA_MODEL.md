@@ -1,6 +1,6 @@
 # Data Model & Storage Architecture
 ## Project: CHARGE SCIENCE
-**Database Engine:** Room 2.6.1 / SQLite (WAL mode)  
+**Database Engine:** Room 2.6.1 / SQLite (WAL mode, Version 2)  
 **Code Generation:** KSP 2.3.13 (`room.generateKotlin = "true"`)  
 **Preferences Engine:** Jetpack DataStore Preferences
 
@@ -40,7 +40,8 @@ data class ChargingSessionEntity(
     val missingSampleCount: Int = 0,
     val confidenceScore: Float = 0f, // 0.0 - 100.0 (S_conf)
     val isCompleted: Boolean = false,
-    val wasInterrupted: Boolean = false // Process killed, crash, or unexpected device reboot
+    val wasInterrupted: Boolean = false, // Process killed, crash, or unexpected device reboot
+    val accessoryId: Long? = null // Associated accessory profile ID (power brick, wireless pad)
 )
 ```
 
@@ -77,56 +78,94 @@ data class TelemetrySampleEntity(
 )
 ```
 
-### 1.3 `ChargingSessionDao` & `TelemetrySampleDao`
-Reactive query API returning Kotlin `Flow` for real-time Compose observation:
-
-- `ChargingSessionDao.getAllSessions(): Flow<List<ChargingSessionEntity>>`
-- `ChargingSessionDao.getSessionById(sessionId: Long): Flow<ChargingSessionEntity?>`
-- `ChargingSessionDao.getLatestActiveSession(): Flow<ChargingSessionEntity?>`
-- `TelemetrySampleDao.getSamplesForSession(sessionId: Long): Flow<List<TelemetrySampleEntity>>`
-- `TelemetrySampleDao.getRecentSamplesForSession(sessionId: Long, sinceTimestamp: Long): Flow<List<TelemetrySampleEntity>>`
-
----
-
-## 2. In-Memory Domain Model: `BatteryTelemetry`
-
-Exposed at runtime by `BatteryTelemetryCollector` as `StateFlow<BatteryTelemetry>`:
+### 1.3 `AccessoryProfileEntity` (Added in Version 2)
+Persisted user-managed and auto-correlated charging accessory hardware profiles.
 
 ```kotlin
-data class BatteryTelemetry(
-    val timestamp: Long = System.currentTimeMillis(),
-    val isCharging: Boolean = false,
-    val status: Int = 1, // BatteryManager.BATTERY_STATUS_*
-    val level: Int = 0, // 0 - 100%
-    val voltageMv: Int = 0, // Terminal voltage in mV
-    val currentMa: Int = 0, // Net current in mA (+ charge, - discharge)
-    val wattage: Float = 0f, // Net battery power: (V * I) in Watts
-    val temperatureCelsius: Float = 0f, // Temperature in °C
-    val pluggedSource: Int = 0, // AC, USB, Wireless
-    val maxChargingVoltageUv: Int = 0, // Negotiated profile limit
-    val maxChargingCurrentUa: Int = 0, // Negotiated profile limit
-    val negotiatedMaxPowerWatts: Float = 0f, // Max theoretical watts
-    val cycleCount: Int = -1, // Hardware cycle count
-    val remainingChargeUah: Long = -1L, // Remaining charge counter
-    val thermalStatus: Int = 0, // Thermal throttling state
-    val thermalHeadroom: Float = 0f, // Margin to severe throttling
-    val chargeTimeRemainingMs: Long = -1L
+@Entity(tableName = "accessory_profiles")
+data class AccessoryProfileEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val type: String, // CHARGER, CABLE, WIRELESS_PAD, POWER_BANK
+    val nickname: String, // e.g. "Google 30W USB-C Charger", "Anker 737 GaN"
+    val manufacturer: String = "Unknown",
+    val model: String = "Unknown",
+    val claimedWattage: Float = 0f,
+    val verifiedProtocols: String = "",
+    val maxObservedPowerWatts: Float = 0f,
+    val firstSeenTimestamp: Long = System.currentTimeMillis(),
+    val lastSeenTimestamp: Long = System.currentTimeMillis(),
+    val notes: String = ""
 )
 ```
 
 ---
 
-## 3. Database Engine Configuration
+## 2. Room Migrations
 
-### Room Kotlin Code Generation
-To prevent javac generic erasure conflicts with Kotlin coroutine `Continuation` stubs in Room 2.6.1 + KSP 2.3+, KSP is configured to generate native Kotlin code:
-
+### `MIGRATION_1_2`
 ```kotlin
-ksp {
-    arg("room.generateKotlin", "true")
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE charging_sessions ADD COLUMN accessoryId INTEGER DEFAULT NULL")
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS accessory_profiles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                type TEXT NOT NULL,
+                nickname TEXT NOT NULL,
+                manufacturer TEXT NOT NULL,
+                model TEXT NOT NULL,
+                claimedWattage REAL NOT NULL,
+                verifiedProtocols TEXT NOT NULL,
+                maxObservedPowerWatts REAL NOT NULL,
+                firstSeenTimestamp INTEGER NOT NULL,
+                lastSeenTimestamp INTEGER NOT NULL,
+                notes TEXT NOT NULL
+            )
+        """.trimIndent())
+    }
 }
 ```
 
-### Threading & Concurrency
-- All write operations execute within transaction scopes on `Dispatchers.IO`.
-- WAL (Write-Ahead Logging) is automatically enabled by Room on Android SQLite, enabling concurrent reads from Jetpack Compose UI while telemetry samples are inserted in the background at 1 Hz.
+---
+
+## 3. Data Export Schema (Version 1)
+
+### JSON Laboratory Export Structure
+```json
+{
+  "app_name": "Charge Science",
+  "app_version": "1.0",
+  "schema_version": 1,
+  "export_timestamp_iso": "2026-11-10T17:45:00Z",
+  "device_hardware": {
+    "manufacturer": "Google",
+    "model": "Pixel 8a",
+    "code_name": "akita",
+    "nominal_design_capacity_mah": 4492,
+    "pmic_fuel_gauge": "Maxim MAX77759 ModelGauge m5"
+  },
+  "accessories": [
+    {
+      "id": 1,
+      "type": "CHARGER",
+      "nickname": "Google 30W USB-C",
+      "manufacturer": "Google",
+      "claimed_wattage": 30.0
+    }
+  ],
+  "sessions": [
+    {
+      "session_id": 1,
+      "start_timestamp_iso": "2026-11-10T17:00:00Z",
+      "duration_seconds": 1800,
+      "start_soc": 20,
+      "end_soc": 75,
+      "average_power_watts": 14.82,
+      "samples": [
+        { "id": 1, "t": 1700000000000, "v": 3850, "i": 2200, "p": 8.47, "temp": 26.5, "soc": 20, "th": 0 }
+      ]
+    }
+  ]
+}
+```

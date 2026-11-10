@@ -25,6 +25,12 @@ interface ChargingSessionDao {
     @Query("SELECT * FROM charging_sessions ORDER BY startTimestamp DESC")
     fun getAllSessionsFlow(): Flow<List<ChargingSessionEntity>>
 
+    @Query("SELECT * FROM charging_sessions ORDER BY startTimestamp DESC")
+    suspend fun getAllSessions(): List<ChargingSessionEntity>
+
+    @Query("UPDATE charging_sessions SET accessoryId = :accessoryId WHERE id = :sessionId")
+    suspend fun linkAccessoryToSession(sessionId: Long, accessoryId: Long?): Int
+
     @Query("DELETE FROM charging_sessions WHERE id = :sessionId")
     suspend fun deleteSession(sessionId: Long): Int
 

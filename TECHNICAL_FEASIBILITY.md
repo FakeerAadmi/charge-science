@@ -2,81 +2,71 @@
 ## Google Pixel 8a Reference Hardware (Android 14, 15 & 17 Preview)
 
 This document classifies every charging, electrical, and battery metric into four strict scientific categories:
-1. **DIRECTLY MEASURABLE:** Available from a reliable, verified system source.
+1. **MEASURED:** Available directly from a verified hardware sensor or register.
 2. **DERIVED:** Calculated from direct measurements using deterministic physical laws.
-3. **ESTIMATED:** Inferred from available measurements using statistical models, with documented uncertainty.
-4. **UNAVAILABLE:** Cannot be obtained on unrooted devices without specialized external test equipment.
+3. **ESTIMATED:** Inferred using statistical or thermodynamic models, with documented uncertainty.
+4. **UNAVAILABLE:** Cannot be obtained on unrooted devices without external inline hardware.
 
 ---
 
 ## 1. Metric Classification Matrix
 
-| Telemetry Field | Classification | System Source / API | Unit & Range | Sampling Rate | Known Constraints & Physics |
-|---|---|---|---|---|---|
-| **Cell Terminal Voltage** | DIRECTLY MEASURABLE | `BatteryManager.EXTRA_VOLTAGE` | Millivolts ($mV$), $\sim 3400 - 4450mV$ | Broadcast on change ($\sim 0.5 - 2Hz$) | Battery-side terminal voltage, includes ohmic $IR$ drop. NOT USB Vbus. |
-| **Instantaneous Current** | DIRECTLY MEASURABLE | `BATTERY_PROPERTY_CURRENT_NOW` | Microamperes ($\mu A$), $\pm 5000mA$ | Polling ($1 - 4Hz$) | Positive = charging into battery, Negative = discharging. Sourced from Maxim MAX77759 shunt. |
-| **Average Current** | DIRECTLY MEASURABLE | `BATTERY_PROPERTY_CURRENT_AVERAGE` | Microamperes ($\mu A$) | Polling ($1 - 4Hz$) | 10–30s rolling average from hardware fuel gauge register. |
-| **Battery State of Charge** | DIRECTLY MEASURABLE | `BATTERY_PROPERTY_CAPACITY` / `EXTRA_LEVEL` | Integer percent ($0 - 100\%$) | Broadcast on change | Filtered Coulomb counter + OCV state from PMIC. |
-| **Remaining Charge** | DIRECTLY MEASURABLE | `BATTERY_PROPERTY_CHARGE_COUNTER` | Microampere-hours ($\mu Ah$) | Polling | Supported on Pixel 8a. $\sim 4,492,000 \mu Ah$ nominal design. |
-| **Battery Temperature** | DIRECTLY MEASURABLE | `BatteryManager.EXTRA_TEMPERATURE` | Tenths of $^\circ C$ ($0.1^\circ C$) | Broadcast on change | Sourced from internal battery pouch NTC thermistor. |
-| **Power Source Type** | DIRECTLY MEASURABLE | `BatteryManager.EXTRA_PLUGGED` | Bitmask (AC, USB, Wireless, Dock) | Broadcast on change | AC indicates high-power wall adapter; Wireless indicates Qi inductive coil. |
-| **Max Charging Voltage** | DIRECTLY MEASURABLE | `EXTRA_MAX_CHARGING_VOLTAGE` (`"max_charging_voltage"`) | Microvolts ($\mu V$), e.g. $9,000,000\mu V$ | Broadcast on change | Negotiated USB-PD profile voltage limit. |
-| **Max Charging Current** | DIRECTLY MEASURABLE | `EXTRA_MAX_CHARGING_CURRENT` (`"max_charging_current"`) | Microamperes ($\mu A$), e.g. $2,200,000\mu A$ | Broadcast on change | Negotiated USB-PD profile current limit. |
-| **Charge Cycle Count** | DIRECTLY MEASURABLE | `BatteryManager.EXTRA_CYCLE_COUNT` | Integer cycles | Broadcast on change (API 34+) | Hardware fuel gauge non-volatile cycle count register. |
-| **Thermal Throttling Code** | DIRECTLY MEASURABLE | `PowerManager.OnThermalStatusChangedListener` | Integer enum ($0 - 6$) | Event callback | Direct from Android Thermal HAL AIDL 3. |
-| **Thermal Headroom** | DIRECTLY MEASURABLE | `PowerManager.getThermalHeadroom(forecast)` | Float ($0.0 - 1.5+$) | Polling (max 1Hz) | $1.0$ indicates severe throttling threshold. |
-| **Net Battery Power** | DERIVED | $P_{cell} = V_{cell} \times I_{cell}$ | Watts ($W$) | $1 - 2Hz$ | Pure physical power delivered into battery chemistry. |
-| **Max Power Ceiling** | DERIVED | $P_{max} = V_{max} \times I_{max}$ | Watts ($W$) | Static per connection | Theoretical upper limit negotiated with USB-PD power brick. |
-| **Protocol Classification** | DERIVED | Logic: $V_{max} > 5V \implies \text{USB-PD}$ | Categorical | Static per connection | Deterministic on Pixel hardware (no proprietary VOOC/HyperCharge). |
-| **Full Capacity (SOH)** | ESTIMATED | $\Delta Q / \Delta SOC$ with gating filter | Millampere-hours ($mAh$) | Per validated session | Error bounded: $\pm 3 - 5\%$ under high-confidence sessions ($S_{conf} \ge 80\%$). |
-| **Charger Input Power** | ESTIMATED | $P_{in} \approx (P_{cell} + P_{sys}) / \eta_{pmic}$ | Watts ($W$) | $1Hz$ | Uncertainty $\pm 15 - 25\%$; requires modeling PMIC efficiency ($\sim 90 - 93\%$) and display/SoC load. |
-| **Cable Resistance** | ESTIMATED | $R_{cable} \approx \Delta V_{drop} / \Delta I$ | Milliohms ($m\Omega$) | Transient detection | Requires step current transitions. |
-| **Time to Full** | ESTIMATED | `BatteryManager.computeChargeTimeRemaining()` | Milliseconds ($ms$) | Polling | Computed by Android BatteryStats CC-CV model. |
-| **USB Energy Counter** | UNAVAILABLE | `BATTERY_PROPERTY_ENERGY_COUNTER` | nWh | N/A | Returns `Long.MIN_VALUE` on Pixel Tensor hardware. Must be integrated in software. |
-| **Raw Vbus / Ibus Pins** | UNAVAILABLE | Direct USB-C hardware pins | Volts / Amperes | N/A | Restricted to kernel driver (`tcpm`). Third-party apps cannot access Vbus ADC. |
-| **USB PDO / APDO Packets** | UNAVAILABLE | USB-PD CC-line packet sniffer | Digital packets | N/A | Requires `@SystemApi` `MANAGE_USB` (Signature/Privileged) or external hardware sniffer. |
-| **Cable E-Marker ID** | UNAVAILABLE | SOP' / SOP'' CC wire messages | Hex vendor IDs | N/A | Not exposed to unprivileged userspace applications. |
-| **Qi Transmitter Telemetry**| UNAVAILABLE | Qi coil AC voltage / frequency | V / kHz | N/A | Pad power and coil alignment metrics are not transmitted over Qi BPP/EPP to Android framework. |
+| Telemetry Field | Classification | System Source / API | Unit & Range | Known Constraints & Physics |
+|---|---|---|---|---|
+| **Cell Terminal Voltage** | MEASURED | `BatteryManager.EXTRA_VOLTAGE` | Millivolts ($mV$), $\sim 3400 - 4450mV$ | Battery-side terminal voltage from fuel gauge Kelvin shunt. NOT USB Vbus. |
+| **Instantaneous Current** | MEASURED | `BATTERY_PROPERTY_CURRENT_NOW` | Microamperes ($\mu A$), $\pm 5000mA$ | Positive = charging into battery, Negative = discharging. From MAX77759. |
+| **Average Current** | MEASURED | `BATTERY_PROPERTY_CURRENT_AVERAGE` | Microamperes ($\mu A$) | 10–30s rolling hardware filter from fuel gauge register. |
+| **Battery State of Charge** | MEASURED | `BATTERY_PROPERTY_CAPACITY` / `EXTRA_LEVEL` | Integer percent ($0 - 100\%$) | Coulomb counter + OCV state from PMIC. |
+| **Remaining Charge** | MEASURED | `BATTERY_PROPERTY_CHARGE_COUNTER` | Microampere-hours ($\mu Ah$) | Supported on Pixel 8a. $\sim 4,492,000 \mu Ah$ nominal design. |
+| **Battery Temperature** | MEASURED | `BatteryManager.EXTRA_TEMPERATURE` | Tenths of $^\circ C$ ($0.1^\circ C$) | Sourced from internal battery pouch NTC thermistor. |
+| **Power Source Type** | MEASURED | `BatteryManager.EXTRA_PLUGGED` | Bitmask (AC, USB, Wireless, Dock) | AC indicates high-power wall adapter; Wireless indicates Qi inductive coil. |
+| **Max Charging Voltage** | MEASURED | `EXTRA_MAX_CHARGING_VOLTAGE` (`"max_charging_voltage"`) | Microvolts ($\mu V$), e.g. $9,000,000\mu V$ | Advertised USB-PD profile voltage limit. |
+| **Max Charging Current** | MEASURED | `EXTRA_MAX_CHARGING_CURRENT` (`"max_charging_current"`) | Microamperes ($\mu A$), e.g. $2,200,000\mu A$ | Advertised USB-PD profile current limit. |
+| **Charge Cycle Count** | MEASURED | `BatteryManager.EXTRA_CYCLE_COUNT` | Integer cycles | Hardware fuel gauge non-volatile cycle count register (782 on test unit). |
+| **Thermal Throttling State**| MEASURED | `PowerManager.OnThermalStatusChangedListener` | Integer enum ($0 - 6$) | Direct from Android Thermal HAL AIDL 3. |
+| **Thermal Headroom** | MEASURED | `PowerManager.getThermalHeadroom(0)` | Float ($0.0 - 1.5+$) | Margin to severe throttling threshold ($1.0$). |
+| **Net Battery Power** | DERIVED | $P_{\text{cell}} = V_{\text{cell}} \times I_{\text{cell}}$ | Watts ($W$) | Pure physical Joules entering battery cell chemistry. |
+| **Max Power Ceiling** | DERIVED | $P_{\text{max}} = V_{\text{max}} \times I_{\text{max}}$ | Watts ($W$) | Theoretical upper limit negotiated with USB-PD power brick. |
+| **Protocol Classification** | DERIVED | `ChargingProtocolClassifier.classify()` | Categorical enum | Rigorous deterministic inference based on voltage/current/source. |
+| **Session Confidence (S_conf)**| DERIVED | Multi-factor weighted score | Percent ($0 - 100\%$) | Gated on SOC swing, thermal stability, taper rest, and sample continuity. |
+| **Charger Input Power** | ESTIMATED | $P_{\text{in}} \approx (P_{\text{cell}} + P_{\text{sys}}) / \eta_{\text{PMIC}}$ | Watts ($W$) | Uncertainty $\pm 15 - 25\%$; requires modeling PMIC efficiency ($\sim 92\%$). |
+| **Full Capacity (SOH)** | ESTIMATED | $\Delta Q / \Delta \text{SOC}$ with gating filter | Millampere-hours ($mAh$) | Error bounded: $\pm 2 - 3\%$ under high-confidence sessions ($S_{\text{conf}} \ge 80\%$). |
+| **USB-C Cable Resistance** | UNAVAILABLE | External Vbus and Ibus sensing | Milliohms ($m\Omega$) | **Physically impossible from battery telemetry** (switching buck disconnect). |
+| **Cable E-Marker VID/PID** | UNAVAILABLE | SOP' / SOP'' CC-line packets | Hex IDs, 3A vs 5A | Locked behind kernel driver; no public Android SDK API. |
+| **Charger Model / Name** | UNAVAILABLE | USB data enumeration | String | Wall chargers do not enumerate on USB data bus (`UsbDevice` empty). |
+| **Wireless Wall Consumption**| UNAVAILABLE | AC mains sensing | Watts | Inaccessible due to inductive air gap isolation. |
 
 ---
 
-## 2. Mathematical Power Derivations
+## 2. Hardware Enumeration & System API Boundaries
 
-### Battery-Side Power vs. Charger-Side Power
-$$P_{\text{battery}} = \left(\frac{V_{\text{cell}}}{1{,}000}\right) \times \left(\frac{I_{\text{cell}}}{1{,}000{,}000}\right) \quad [\text{Watts}]$$
+### 2.1 Why Wall Chargers Never Enumerate as USB Devices
+- Android's `UsbManager.getDeviceList()` operates in USB Host Mode to detect data peripherals (mice, keyboards, USB drives).
+- USB wall chargers are Dedicated Charging Ports (DCP) or USB Type-C Sources that communicate solely via shorted $D+/D-$ lines or CC-pin BMC packets.
+- They lack USB endpoint controllers (EP0) and exchange zero USB data descriptors. Consequently, standard third-party apps cannot discover charger brand, model, or serial number through software.
 
-$$P_{\text{charger}} = \frac{P_{\text{battery}} + P_{\text{system}}}{\eta_{\text{PMIC}}} + I_{\text{cable}}^2 R_{\text{cable}} \quad [\text{Watts}]$$
-
-Where:
-- $V_{\text{cell}}$ is read in millivolts from `EXTRA_VOLTAGE`.
-- $I_{\text{cell}}$ is read in microamperes from `BATTERY_PROPERTY_CURRENT_NOW`.
-- $P_{\text{system}}$ is the dynamic phone power consumption (Display + Tensor G3 SoC + Modem).
-- $\eta_{\text{PMIC}}$ is the PMIC buck regulator switching efficiency ($88\% - 94\%$).
-
-**Crucial Engineering Rule:** The app shall **never** display $P_{\text{battery}}$ as "Charger Power". It is always labeled as **"Net Battery Power"**.
+### 2.2 USB Port Status & `@SystemApi` Barrier
+- Android framework classes `UsbPort`, `UsbPortStatus`, and `UsbManager.getPorts()` are marked `@SystemApi` and require `android.permission.MANAGE_USB` with protection level `signature|privileged`.
+- Ordinary applications cannot query physical USB port status directly or manipulate power/data roles.
 
 ---
 
-## 3. Background Execution & Foreground Service Architecture
+## 3. External BLE Power Meter Integration Architecture
 
-### 3.1 OS Level Background Restrictions (Android 14, 15 & 17)
-1. **Foreground Service Type Restriction:**
-   - In Android 14+ (API 34+), foreground services must declare a specific `android:foregroundServiceType`.
-   - `dataSync` is restricted in Android 15+ to a strict 6-hour cumulative runtime per 24-hour period.
-   - `health` is strictly rejected for device hardware telemetry (Google Play policy restricts `health` to human medical/biometric sensors).
-   - **Compliant Solution:** Use `specialUse` with an explicit subtype property:
-     ```xml
-     <service
-         android:name=".diagnostics.ChargingTelemetryService"
-         android:foregroundServiceType="specialUse"
-         android:exported="false">
-         <property
-             android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-             android:value="charging_telemetry_recording" />
-     </service>
-     ```
+To provide true $V_{\text{BUS}}$, $I_{\text{BUS}}$, E-Marker identification, and Kelvin cable resistance, Charge Science specifies an open BLE architecture:
 
-2. **CPU Suspend & Partial WakeLocks:**
-   - While an Android phone is connected to power, Android disables standard battery Doze mode. However, when the screen turns off, the kernel CPU governor aggressively enters low-power C-states and suspends userspace threads.
-   - To achieve gapless 1 Hz telemetry sampling across multi-hour charging sessions, the app acquires a `PowerManager.PARTIAL_WAKE_LOCK`.
-   - **Safety Invariant:** The WakeLock is acquired **strictly** while `isCharging == true`. As soon as charging stops or the cable is detached, the WakeLock is immediately released and the foreground service stops.
+### Compatible Hardware
+- **FNIRSI FNB58 / FNB48S Bluetooth Edition**
+- **RD Tech TC66C / UM25C Bluetooth**
+- Custom ESP32 / INA226 Kelvin-sensing dongle
+
+### Integration Pipeline
+```mermaid
+flowchart LR
+    Charger[USB-PD Charger] -->|Vbus / CC| Meter[Inline BLE Power Meter\nFNIRSI FNB58 / TC66C]
+    Meter -->|Tested Cable| Phone[Google Pixel 8a]
+    Meter -->|BLE GATT UART\nUUID: 0xFFE0 / 0xFFE1| App[Charge Science App]
+    App -->|Calculates True Drop| Engine[Kelvin Resistance Engine\nR = ΔV / ΔI]
+```
+- **Permissions:** `android.permission.BLUETOOTH_SCAN` (`neverForLocation`), `android.permission.BLUETOOTH_CONNECT`.
+- **Packet Structure:** 16-bit ADC streams true Vbus (mV), Ibus (mA), D+/D- voltages, and decoded Cable VDO (3A vs 5A / EPR 240W).
