@@ -49,6 +49,15 @@ This document classifies every charging, electrical, and battery metric into fou
 - Android framework classes `UsbPort`, `UsbPortStatus`, and `UsbManager.getPorts()` are marked `@SystemApi` and require `android.permission.MANAGE_USB` with protection level `signature|privileged`.
 - Ordinary applications cannot query physical USB port status directly or manipulate power/data roles.
 
+### 2.3 Wireless Charging Telemetry Boundaries & FOD Inaccessibility
+- **Qi Transmitter Firmware:** Operating parameters inside a third-party wireless charging pad (inverter duty cycle, coil switching frequency, resonant tank capacitance, primary coil temperature) are not transmitted over the standard Qi communication channel to the Android framework.
+- **Foreign Object Detection (FOD) Flag:** While the Qi specification computes $\Delta P_{\text{loss}} = P_{\text{tx}} - P_{\text{rx}}$, this comparator resides strictly inside the transmitter's micro-controller. If tripped, the pad cuts power abruptly without delivering an explicit "FOD Error" code to the Android OS. The application infers transmitter FOD by correlating abrupt unplugs with cold/moderate phone battery temperatures ($< 38^\circ\text{C}$).
+- **Coil Centering Telemetry:** The Qi standard does not expose an analog spatial offset metric ($\Delta X, \Delta Y$ in millimeters) to the OS. Spatial misalignment is inferred through power coupling stability and magnetic ring geometry.
+
+### 2.4 Maxim ModelGauge m5 Sysfs Boundaries
+- **SELinux Enforcing Mode:** Modern Android (Android 14/15/17) blocks `untrusted_app` contexts from reading `/sys/class/power_supply/*/uevent` or `/sys/class/power_supply/maxfg/m5_model_state`.
+- **Public API Coverage:** Android exposes essential registers through official channels: `BATTERY_PROPERTY_CHARGE_COUNTER` (`RepCap` in $\mu\text{Ah}$), `EXTRA_CYCLE_COUNT` (`Cycles` register), `BATTERY_PROPERTY_CAPACITY` (`RepSOC`), and `BATTERY_PROPERTY_CURRENT_NOW` / `CURRENT_AVERAGE`. Charge Science utilizes these verified public interfaces to deliver laboratory-grade accuracy without requiring root.
+
 ---
 
 ## 3. External BLE Power Meter Integration Architecture

@@ -304,6 +304,15 @@ class ChargingSessionManager(
         sessionDao.updateSession(finalized)
         Log.i("ChargeScience", "Session #$sessionId finalized: duration=${activeChargingSeconds}s, avgPower=${avgPower}W, deltaSoc=${deltaSoc}%, confidence=${confidence}%")
 
+        try {
+            val healthEngine = com.example.chargescience.domain.health.BatteryHealthLaboratoryEngine()
+            val capacityEstimate = healthEngine.evaluateSessionCapacity(finalized)
+            database.batteryCapacityEstimateDao().insertEstimate(capacityEstimate)
+            Log.i("ChargeScience", "Evaluated capacity for Session #$sessionId: status=${capacityEstimate.eligibilityStatus}, cap=${capacityEstimate.calculatedCapacityMah}mAh")
+        } catch (e: Exception) {
+            Log.e("ChargeScience", "Failed to evaluate battery capacity estimate", e)
+        }
+
         currentSessionId = null
         currentChargeSource = 0
         isActivelyCharging = false

@@ -4,9 +4,99 @@
 **Code Generation:** KSP 2.3.13 (`room.generateKotlin = "true"`)  
 **Preferences Engine:** Jetpack DataStore Preferences
 
+### 1.4 `WirelessExperimentEntity`
+Tracks controlled diagnostic experiments for isolating wireless charging failure modes (misalignment, thermal cutoff, FOD).
+
+```kotlin
+@Entity(
+    tableName = "wireless_experiments",
+    foreignKeys = [
+        ForeignKey(
+            entity = AccessoryProfileEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["accessoryId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [Index("accessoryId"), Index("startTimestamp")]
+)
+data class WirelessExperimentEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val experimentType: String, // "BASELINE_A", "ALIGNMENT_B", "RING_REMOVED_C", "ALT_CHARGER_D", "THERMAL_E", "CUSTOM"
+    val label: String,
+    val startTimestamp: Long,
+    val endTimestamp: Long? = null,
+    val durationSeconds: Long = 0L,
+    val startSoc: Int = 0,
+    val endSoc: Int = 0,
+    val startTempCelsius: Float = 0f,
+    val maxTempCelsius: Float = 0f,
+    val endTempCelsius: Float = 0f,
+    val startThermalStatus: Int = 0,
+    val maxThermalStatus: Int = 0,
+    val interruptionTimestamp: Long? = null,
+    val elapsedToInterruptionSeconds: Long? = null,
+    val didDisconnect: Boolean = false,
+    val cutoffReason: String? = null,
+    val preInterruptionAvgPowerWatts: Float? = null,
+    val preInterruptionMaxTempCelsius: Float? = null,
+    val preInterruptionThermalStatus: Int? = null,
+    val preInterruptionDropPattern: String? = null,
+    val ringOuterDiameterMm: Float = 55.0f,
+    val ringInnerDiameterMm: Float = 44.0f,
+    val ringThicknessMm: Float = 1.0f,
+    val ringOffsetMm: Float = 0.0f,
+    val ringIsPermanentMagnet: Boolean = true,
+    val ringBrandOrModel: String = "",
+    val accessoryId: Long? = null,
+    val diagnosticOutcome: String? = null,
+    val confidenceScore: Float = 0f,
+    val userNotes: String? = null
+)
+```
+
+### 1.5 `BatteryCapacityEstimateEntity`
+Stores qualified Coulomb-counting capacity estimations and gating rejections.
+
+```kotlin
+@Entity(
+    tableName = "battery_capacity_estimates",
+    foreignKeys = [
+        ForeignKey(
+            entity = ChargingSessionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("sessionId"), Index("timestamp")]
+)
+data class BatteryCapacityEstimateEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val sessionId: Long,
+    val timestamp: Long,
+    val startSoc: Int,
+    val endSoc: Int,
+    val deltaSoc: Int,
+    val deltaChargeCounterUah: Long,
+    val calculatedCapacityMah: Float,
+    val estimatedSohPercent: Float,
+    val averageTempCelsius: Float,
+    val maxTempCelsius: Float,
+    val cycleCountAtSession: Int,
+    val eligibilityStatus: String, // "VALID", "REJECTED_LOW_DELTA_SOC", "REJECTED_THERMAL_INSTABILITY", "REJECTED_INTERRUPTED"
+    val rejectionReason: String? = null
+)
+```
+
 ---
 
-## 1. Entity Definitions
+## 4. Database Migrations
+
+- **`MIGRATION_1_2` (V1 -> V2):** Added `accessoryId` foreign key to `charging_sessions` and created `accessory_profiles` table.
+- **`MIGRATION_2_3` (V2 -> V3):** Created `wireless_experiments` and `battery_capacity_estimates` tables with foreign keys and indexes.
 
 ### 1.1 `ChargingSessionEntity`
 Represents an uninterrupted active charging session with comprehensive thermodynamic and electrical telemetry.

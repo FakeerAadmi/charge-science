@@ -20,13 +20,15 @@ import com.example.chargescience.ui.health.BatteryHealthScreen
 import com.example.chargescience.ui.history.ChargingHistoryScreen
 import com.example.chargescience.ui.lab.ChargingLabScreen
 import com.example.chargescience.ui.overview.OverviewScreen
+import com.example.chargescience.ui.wireless.WirelessDiagnosticsScreen
 import kotlinx.coroutines.flow.emptyFlow
 
 enum class NavDestination(val label: String) {
     OVERVIEW("Overview"),
     LAB("Lab"),
-    HISTORY("History"),
+    WIRELESS("Wireless"),
     CHARGER("Charger"),
+    HISTORY("History"),
     HEALTH("Health")
 }
 
@@ -49,6 +51,14 @@ fun MainScreen(
 
     // Observe all saved accessories
     val allAccessories by database.accessoryProfileDao().getAllAccessoriesFlow()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+
+    // Observe all wireless experiments
+    val allExperiments by database.wirelessExperimentDao().getAllExperimentsFlow()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+
+    // Observe all battery capacity estimates
+    val allEstimates by database.batteryCapacityEstimateDao().getAllEstimatesFlow()
         .collectAsStateWithLifecycle(initialValue = emptyList())
 
     // If an active session is running, observe its live samples; otherwise, use latest session samples
@@ -117,8 +127,16 @@ fun MainScreen(
                             )
                         },
                         icon = {
+                            val symbol = when (destination) {
+                                NavDestination.OVERVIEW -> "⚡"
+                                NavDestination.LAB -> "📈"
+                                NavDestination.WIRELESS -> "◎"
+                                NavDestination.CHARGER -> "🔌"
+                                NavDestination.HISTORY -> "⏱"
+                                NavDestination.HEALTH -> "♥"
+                            }
                             Text(
-                                text = destination.label.take(1),
+                                text = symbol,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (selectedDestination == destination) {
                                     MaterialTheme.colorScheme.primary
@@ -143,6 +161,15 @@ fun MainScreen(
                     telemetry = telemetry,
                     activeSamples = liveSamples
                 )
+                NavDestination.WIRELESS -> WirelessDiagnosticsScreen(
+                    telemetry = telemetry,
+                    activeSamples = liveSamples,
+                    experiments = allExperiments,
+                    accessories = allAccessories,
+                    onSaveExperiment = { exp ->
+                        database.wirelessExperimentDao().insertExperiment(exp)
+                    }
+                )
                 NavDestination.HISTORY -> ChargingHistoryScreen(
                     sessions = allSessions,
                     accessories = allAccessories,
@@ -160,7 +187,11 @@ fun MainScreen(
                         database.accessoryProfileDao().insertAccessory(accessory)
                     }
                 )
-                NavDestination.HEALTH -> BatteryHealthScreen(telemetry = telemetry)
+                NavDestination.HEALTH -> BatteryHealthScreen(
+                    telemetry = telemetry,
+                    estimates = allEstimates,
+                    sessions = allSessions
+                )
             }
         }
     }

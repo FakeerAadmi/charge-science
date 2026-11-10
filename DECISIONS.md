@@ -83,3 +83,19 @@
 - **Context:** Users need to export raw telemetry (CSV/JSON) for external laboratory analysis in Python/Excel, but the application must strictly adhere to zero network permissions.
 - **Decision:** Implement `DataExportManager` using Android's native `FileProvider` (`androidx.core.content.FileProvider`) writing to the application's internal cache directory and launching `Intent.ACTION_SEND` with temporary read URI permissions.
 - **Consequences:** Clean, privacy-first local export without requesting `INTERNET` or `WRITE_EXTERNAL_STORAGE` permissions.
+
+---
+
+### ADR 011: Telemetry-Driven Wireless Failure Mode Classification
+- **Status:** Accepted
+- **Context:** Wireless charging with an aftermarket ring attached frequently terminates at ~10 minutes. Without opening the hardware or using external thermal cameras, users cannot discern if the termination was commanded by the phone's thermal protection or the charging pad's Foreign Object Detection (FOD).
+- **Decision:** Implement `WirelessDiagnosticEngine` analyzing the preceding 60–120s buffer before interruption. If `EXTRA_PLUGGED` remains `WIRELESS` while $I_{\text{batt}} \to 0$ and $T_{\text{batt}} \ge 40.5^\circ\text{C}$ / `thermalStatus` $\ge 2$, classify as `PHONE_THERMAL_THROTTLE`. If `EXTRA_PLUGGED` drops abruptly to `0` at moderate temperatures, classify as `TX_SHUTDOWN_FOD`.
+- **Consequences:** Provides actionable, evidence-based diagnostic interpretations without claiming impossible direct knowledge of third-party transmitter firmware.
+
+---
+
+### ADR 012: Multi-Gated Coulomb Counting for Battery Usable Capacity Estimation
+- **Status:** Accepted
+- **Context:** Estimating battery capacity from small partial charges amplifies 1% integer SOC rounding errors exponentially ($\epsilon_{\text{quant}} = 1\% / \Delta\text{SOC}$), while thermal swings warp apparent capacity via positive temperature coefficients.
+- **Decision:** Implement `BatteryHealthLaboratoryEngine` with strict gating criteria: $\Delta\text{SOC} \ge 30\%$, $\Delta T \le 8^\circ\text{C}$, $T_{\text{max}} \le 45^\circ\text{C}$, non-positive charge counter rejection, and process interruption filtering. State of Health is computed as a weighted regression over qualified sessions against the 4,492 mAh nominal design capacity.
+- **Consequences:** Eliminates wild capacity fluctuations common in naive battery monitors, producing stable and defensible health trends.

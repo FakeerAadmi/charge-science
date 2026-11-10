@@ -46,7 +46,19 @@ Charge Science implements a modern, reactive, offline-first MVVM architecture ad
   - Listens to Android Thermal HAL via `PowerManager.OnThermalStatusChangedListener` and `getThermalHeadroom(0)`.
   - Exposes an asynchronous `Flow<BatteryTelemetry>` with thread safety via `Dispatchers.Default`.
 
-### 2.2 Background Telemetry Service (`ChargingTelemetryService`)
+### 2.5 Wireless Diagnostic Engine (`com.example.chargescience.domain.wireless`)
+- **`WirelessDiagnosticEngine`:**
+  - Manages active controlled wireless diagnostic tests across Experiments A through E.
+  - Captures a sliding 120-second circular buffer before disconnect.
+  - Evaluates pre-interruption telemetry to distinguish Mode A (Phone Thermal Throttle: $T_{\text{max}} \ge 40.5^\circ\text{C}$, gradual throttle) from Mode B (Transmitter FOD Trip / Pad Overheat: abrupt disconnect at normal phone temperature) and Power Coupling Collapse (misalignment oscillation).
+- **`MagneticRingProfile`:** Models ring physical dimensions, center offset ($\Delta Y = +7.8\text{ mm}$ for G-logo alignment), and eddy-current risk tiers.
+
+### 2.6 Battery Health Laboratory Engine (`com.example.chargescience.domain.health`)
+- **`BatteryHealthLaboratoryEngine`:**
+  - Performs multi-gated Coulomb counting capacity estimation ($C_{\text{est}} = \Delta Q / \Delta\text{SOC}$) across qualified charging sessions.
+  - Rejects sessions with $\Delta\text{SOC} < 30\%$, $\Delta T > 8^\circ\text{C}$, $T_{\text{max}} > 45^\circ\text{C}$, process interruptions, or discrete fuel-gauge recalibration jumps.
+  - Computes weighted State of Health (SoH) regression against the 4,492 mAh nominal design capacity.
+  - Aggregates thermal exposure duration across four thermal stress tiers ($< 30^\circ\text{C}$, $30 - 38^\circ\text{C}$, $38 - 42^\circ\text{C}$, $> 42^\circ\text{C}$) and tracks high-SOC dwell time.
 - Operates under Android 14/15/17 compliant `foregroundServiceType="specialUse"` with `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="charging_telemetry_recording" />`.
 - Holds a `PARTIAL_WAKE_LOCK` strictly while actively charging to prevent CPU suspend when the screen goes dark, ensuring gapless 1 Hz time-series curves.
 - Posts an ongoing, silent (`IMPORTANCE_LOW`, `setOnlyAlertOnce(true)`) status bar notification displaying live wattage, voltage, current, and temperature.

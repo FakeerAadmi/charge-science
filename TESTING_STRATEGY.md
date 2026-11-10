@@ -48,5 +48,32 @@ Implemented in JUnit 4 test suites:
 - `sessionFinalizesOnDischarge`: Asserts transition from charging to discharging sets `endTimestamp`, computes duration, and sets `isCompleted = true`.
 - `chargingSourceTransition_rollsOverToNewSession`: Asserts changing from AC to USB or Wireless rolls over session automatically.
 - `trapezoidalPowerAccumulation_updatesRunningAverage`: Asserts incoming telemetry updates running time-weighted average power.
+- `rebootRecovery_recoversIncompleteSessions`: Asserts incomplete sessions left open by app termination or device reboot are cleanly closed on restart.
+- `interruptionDetection_tracksDisconnects`: Asserts unexpected process kills mark `wasInterrupted = true`.
+
+### 2.3 `ChargingProtocolClassifierTest` (5 Tests)
+- Fixed 9V USB-PD, PPS Candidate, Type-C High Power, USB BC 1.2, and Qi EPP.
+
+### 2.4 `ChargingComparisonEngineTest` (3 Tests)
+- Valid pairing, baseline mismatch warnings ($|\Delta\text{SOC}| > 15\%$), and energy calculation.
+
+### 2.5 `DataExportTest` (3 Tests)
+- RFC 4180 CSV escaping, session CSV serialization, and JSON schema structure.
+
+### 2.6 `WirelessDiagnosticEngineTest` (5 Tests)
+- `testStableCompletionReturnsStableOutcome`: Uninterrupted wireless charging returns stable outcome.
+- `testModeAPhoneThermalThrottleCutoff`: Mode A thermal cutoff ($T_{\text{max}} \ge 41.5^\circ\text{C}$, gradual throttle) identified as `PHONE_THERMAL_THROTTLE`.
+- `testModeBTransmitterFodOrPadOverheat`: Mode B abrupt cutoff with cool battery ($T < 38^\circ\text{C}$) identified as `TX_SHUTDOWN_FOD`.
+- `testPowerCouplingCollapseFromMisalignment`: High power variance identified as `POWER_COUPLING_COLLAPSE`.
+- `testMagneticRingProfileRiskTiers`: Correct risk classification for continuous ferritic steel vs segmented NdFeB.
+
+### 2.7 `BatteryHealthLaboratoryEngineTest` (5 Tests)
+- `testValidChargingSessionCapacityCalculation`: Verifies accurate Coulomb-counted capacity and SoH against nominal 4,492 mAh.
+- `testRejectsLowDeltaSocSession`: Rejects $\Delta\text{SOC} < 30\%$ to bound quantization error.
+- `testRejectsThermalInstabilitySession`: Rejects $\Delta T > 8^\circ\text{C}$ or $T_{\text{max}} > 45^\circ\text{C}$.
+- `testRejectsInterruptedSession`: Rejects interrupted charging sessions.
+- `testMultiSessionHealthSummaryComputation`: Multi-session weighted regression and thermal exposure categorization.
+
+**Total Test Count:** 34 tests passing cleanly.
 - `interruptedSessionRecovery_finalizesUnclosedSessions`: Asserts app launch / reboot scans for unclosed active sessions and closes them with `wasInterrupted = true`.
 - `confidenceScoreCalculated_onSessionCompletion`: Asserts session closure computes and persists $S_{\text{conf}}$.

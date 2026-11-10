@@ -109,3 +109,41 @@ Directly comparing two charging sessions without electrochemical controls produc
    Pre-existing cell heat triggers Android Thermal HAL throttling earlier, reducing average power independently of charger quality.
 3. **Session Integrity:**
    Both sessions must be uninterrupted by app force-stops or reboots, with data confidence $S_{\text{conf}} \ge 75\%$.
+
+---
+
+## 5. Qi Electrodynamics, Magnetic Ring Physics & Failure Mechanisms
+
+### 5.1 Geometric Coil Offset Disparity
+On the Google Pixel 8a (`akita`, dimensions $152.1 \times 72.7 \times 8.9\text{ mm}$):
+- **Receiver (Rx) Coil Center:** $X = 36.35\text{ mm}$ (centered), $Y \approx 62.2\text{ mm}$ from bottom edge (level with bottom edge of Volume Down button).
+- **Rear "G" Logo Center:** $X = 36.35\text{ mm}$, $Y \approx 70.0\text{ mm}$.
+- **Offset ($\Delta Y$):** $+7.8\text{ mm}$.
+Attaching an aftermarket MagSafe conversion ring centered on the cosmetic "G" logo forces a $7.8\text{ mm}$ vertical misalignment, pulling the metallic ring directly into the coil's primary induction winding path.
+
+### 5.2 High-Frequency AC Skin Depth & Eddy Heating
+At Qi frequencies ($f \approx 150\text{ kHz}$):
+- Skin depth in passive ferritic stainless steel (AISI 430, $\mu_r \approx 1000$):
+  $$\delta = \sqrt{\frac{\rho}{\pi f \mu_0 \mu_r}} \approx 31.8\,\mu\text{m}$$
+- The continuous stamped steel ring forms a shorted single-turn secondary transformer winding, generating $0.8 - 1.8\text{ W}$ of parasitic Joule heating ($P = I_{\text{eddy}}^2 R_{\text{AC}}$).
+- In contrast, segmented Neodymium (NdFeB) arrays feature physical dielectric boundaries between magnet blocks, preventing continuous perimeter eddy loops.
+
+### 5.3 The 10-Minute Interruption Dynamics
+- **Mode A (Phone Thermal Throttle):** Ring heat conducts through the chassis. When the virtual sensor `VIRTUAL-SKIN-CHARGE-WLC` crosses $41.0^\circ\text{C} - 42.0^\circ\text{C}$ (matching the device thermal time constant $\tau \approx 10\text{ min}$), the Android Thermal HAL clamps charge current to zero (`dc_icl = 0`). The phone stays `PLUGGED_WIRELESS` but net charging ceases.
+- **Mode B (Transmitter FOD Trip / Pad Overheat):** Ring resistance increases with temperature ($\alpha \approx +0.004/^\circ\text{C}$), pushing power loss $\Delta P_{\text{loss}} = P_{\text{tx}} - P_{\text{rx}} > 500\text{ mW}$ (FOD trip) or tripping the pad's internal thermistor. The pad cuts RF power abruptly, causing `EXTRA_PLUGGED` to drop to `0` while the phone battery is still cool ($< 38^\circ\text{C}$).
+
+---
+
+## 6. Maxim ModelGauge m5 & Defensible Capacity Estimation
+
+### 6.1 Algorithmic Dual-Engine
+The Maxim MAX77759 combines high-speed continuous Coulomb counting (via Kelvin shunt) with thermodynamic Open-Circuit Voltage (OCV) table lookups during relaxation. Filtered reported capacity (`RepCap`) tracks remaining usable charge, while `FullCapNom` and `FullCapRep` evaluate chemical aging.
+
+### 6.2 Coulomb Counting Estimation & Quantization Gating
+Usable capacity across qualified charging windows is derived via:
+$$C_{\text{est}} = \frac{\Delta Q}{\Delta\text{SOC}} = \frac{Q(t_{\text{end}}) - Q(t_{\text{start}})}{\text{SOC}(t_{\text{end}}) - \text{SOC}(t_{\text{start}})}$$
+- **Quantization Error Bound:** $\epsilon_{\text{quant}} \approx \frac{1\%}{\Delta\text{SOC}}$.
+  - $\Delta\text{SOC} < 30\% \implies \epsilon_{\text{quant}} > 3.3\%$ (**Strictly Rejected**).
+  - $\Delta\text{SOC} \ge 40\% \implies \epsilon_{\text{quant}} \le 2.5\%$ (**Laboratory Grade**).
+- **Thermal Rejection:** $\Delta T > 8^\circ\text{C}$ or $T_{\text{max}} > 45^\circ\text{C}$ rejected due to positive temperature coefficient of capacity ($\sim +0.6\%/^\circ\text{C}$).
+- **Monotonicity & Continuity:** Sessions with process interruptions or discrete fuel-gauge recalibration jumps are rejected.

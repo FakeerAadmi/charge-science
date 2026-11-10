@@ -32,8 +32,19 @@
 - [x] Expanded test suite: 24 passing unit tests covering protocol classification, comparison validity rules, CSV escaping, and JSON generation.
 - [x] Verified live on physical Google Pixel 8a.
 
-### Phase 4: External Hardware Meter Integration & Deep Health Calibration (Next Phase)
+### Phase 4: Wireless Diagnostics, Magnetic Ring Investigation & Battery Intelligence (Completed)
+- [x] Dedicated Wireless Charging Diagnostics mode: guided testing workflow with ~1 Hz sampling, live countdown timer, and preceding 120s buffer capture.
+- [x] Physical coil & magnetic ring research on Google Pixel 8a: established exact coil center at $Y \approx 62.2\text{ mm}$ (lower edge of Volume Down button), discovering the $+7.8\text{ mm}$ offset disparity with the cosmetic Google "G" logo ($Y \approx 70.0\text{ mm}$).
+- [x] Electrodynamic characterization of aftermarket rings: proved severe eddy-current Joule dissipation ($0.8 - 1.8\text{ W}$) in solid ferritic steel (AISI 430) due to thin skin depth ($\delta \approx 31.8\,\mu\text{m}$), contrasted with segmented NdFeB arrays.
+- [x] Decoded the ~10-minute wireless cutoff phenomenon: verified dual failure modes (Mode A: phone thermal cutoff at $41.0^\circ\text{C}-42.0^\circ\text{C}$ via `VIRTUAL-SKIN-CHARGE-WLC`; Mode B: transmitter dynamic FOD power loss trip or pad overheat).
+- [x] Rules-based diagnostic analysis engine (`WirelessDiagnosticEngine`) identifying phone thermal throttle, Tx FOD shutdown, power coupling collapse, and accessory interference.
+- [x] Guided physical experiment workflow (Experiments A through E) with persistent local storage (`WirelessExperimentEntity`, Room Version 3, `MIGRATION_2_3`).
+- [x] Battery Health Laboratory (`BatteryHealthLaboratoryEngine`): multi-gated Coulomb counting capacity estimation ($\Delta\text{SOC} \ge 30\%$, $\Delta T \le 8^\circ\text{C}$, non-positive charge counter filtering), SoH percentage against 4,492 mAh nominal design capacity, thermal exposure tiers, and degradation tracking.
+- [x] Polished Material 3 Expressive UI for Wireless Diagnostics and Battery Health with distinct metric classification badges (`[HARDWARE-REPORTED]`, `[NOMINAL DESIGN]`, `[STATISTICAL ESTIMATE]`).
+- [x] 34 passing unit tests covering wireless diagnostic classification, magnetic ring profiles, Coulomb capacity gating, and degradation statistics.
+- [x] Deployed and verified on physical Google Pixel 8a over wireless ADB.
+
+### Phase 5: External Hardware Meter Integration & Low-Level GATT (Next Phase)
 - [ ] Implement Bluetooth Low Energy (BLE) GATT client for FNIRSI FNB58 and TC66C inline power meters.
 - [ ] Real-time external Vbus, Ibus, and Kelvin cable resistance display when BLE meter is connected.
 - [ ] E-Marker decoder for 5A / 240W EPR cable identification.
-- [ ] Multi-cycle ModelGauge m5 electrochemical aging and capacity fade laboratory curves.
