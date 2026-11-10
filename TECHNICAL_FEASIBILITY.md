@@ -28,7 +28,7 @@ This document classifies every charging, electrical, and battery metric into fou
 | **Net Battery Power** | DERIVED | $P_{cell} = V_{cell} \times I_{cell}$ | Watts ($W$) | $1 - 2Hz$ | Pure physical power delivered into battery chemistry. |
 | **Max Power Ceiling** | DERIVED | $P_{max} = V_{max} \times I_{max}$ | Watts ($W$) | Static per connection | Theoretical upper limit negotiated with USB-PD power brick. |
 | **Protocol Classification** | DERIVED | Logic: $V_{max} > 5V \implies \text{USB-PD}$ | Categorical | Static per connection | Deterministic on Pixel hardware (no proprietary VOOC/HyperCharge). |
-| **Full Capacity (SOH)** | ESTIMATED | $\Delta Q / \Delta SOC$ with gating filter | Millampere-hours ($mAh$) | Per validated session | Error bounded: $\pm 3 - 5\%$ under high-confidence sessions ($S_{conf} \ge 85\%$). |
+| **Full Capacity (SOH)** | ESTIMATED | $\Delta Q / \Delta SOC$ with gating filter | Millampere-hours ($mAh$) | Per validated session | Error bounded: $\pm 3 - 5\%$ under high-confidence sessions ($S_{conf} \ge 80\%$). |
 | **Charger Input Power** | ESTIMATED | $P_{in} \approx (P_{cell} + P_{sys}) / \eta_{pmic}$ | Watts ($W$) | $1Hz$ | Uncertainty $\pm 15 - 25\%$; requires modeling PMIC efficiency ($\sim 90 - 93\%$) and display/SoC load. |
 | **Cable Resistance** | ESTIMATED | $R_{cable} \approx \Delta V_{drop} / \Delta I$ | Milliohms ($m\Omega$) | Transient detection | Requires step current transitions. |
 | **Time to Full** | ESTIMATED | `BatteryManager.computeChargeTimeRemaining()` | Milliseconds ($ms$) | Polling | Computed by Android BatteryStats CC-CV model. |
@@ -54,3 +54,29 @@ Where:
 - $\eta_{\text{PMIC}}$ is the PMIC buck regulator switching efficiency ($88\% - 94\%$).
 
 **Crucial Engineering Rule:** The app shall **never** display $P_{\text{battery}}$ as "Charger Power". It is always labeled as **"Net Battery Power"**.
+
+---
+
+## 3. Background Execution & Foreground Service Architecture
+
+### 3.1 OS Level Background Restrictions (Android 14, 15 & 17)
+1. **Foreground Service Type Restriction:**
+   - In Android 14+ (API 34+), foreground services must declare a specific `android:foregroundServiceType`.
+   - `dataSync` is restricted in Android 15+ to a strict 6-hour cumulative runtime per 24-hour period.
+   - `health` is strictly rejected for device hardware telemetry (Google Play policy restricts `health` to human medical/biometric sensors).
+   - **Compliant Solution:** Use `specialUse` with an explicit subtype property:
+     ```xml
+     <service
+         android:name=".diagnostics.ChargingTelemetryService"
+         android:foregroundServiceType="specialUse"
+         android:exported="false">
+         <property
+             android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+             android:value="charging_telemetry_recording" />
+     </service>
+     ```
+
+2. **CPU Suspend & Partial WakeLocks:**
+   - While an Android phone is connected to power, Android disables standard battery Doze mode. However, when the screen turns off, the kernel CPU governor aggressively enters low-power C-states and suspends userspace threads.
+   - To achieve gapless 1 Hz telemetry sampling across multi-hour charging sessions, the app acquires a `PowerManager.PARTIAL_WAKE_LOCK`.
+   - **Safety Invariant:** The WakeLock is acquired **strictly** while `isCharging == true`. As soon as charging stops or the cable is detached, the WakeLock is immediately released and the foreground service stops.

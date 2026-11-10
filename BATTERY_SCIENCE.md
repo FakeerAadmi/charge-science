@@ -11,21 +11,35 @@ This document provides the electrochemical and thermodynamic foundation for **Ch
 Coulomb counting integrates instantaneous current flowing into or out of the cell:
 $$Q(t) = Q(t_0) + \int_{t_0}^t I(\tau) \, d\tau$$
 
-In discrete time with sampling interval $\Delta t_k$:
-$$Q_k = Q_0 + \sum_{k=1}^N I_k \cdot \Delta t_k$$
+In discrete time with non-uniform sampling interval $\Delta t_k = t_{k+1} - t_k$:
+$$Q_k = Q_0 + \sum_{k=1}^N \frac{I_k + I_{k+1}}{2} \cdot \Delta t_k$$
 
 **Error Propagation & Drift:**
-Any current sensor has a zero-mean measurement noise $\nu_k \sim \mathcal{N}(0, \sigma^2)$ and an offset bias $\epsilon_{bias}$. The accumulated error grows:
-$$E_Q(t) = \int_0^t \epsilon_{bias} \, d\tau + \int_0^t \nu(\tau) \, d\tau \approx \epsilon_{bias} \cdot t + \sigma \sqrt{t}$$
+Any current sensor has a zero-mean measurement noise $\nu_k \sim \mathcal{N}(0, \sigma^2)$ and an offset bias $\epsilon_{\text{bias}}$. The accumulated error grows:
+$$E_Q(t) = \int_0^t \epsilon_{\text{bias}} \, d\tau + \int_0^t \nu(\tau) \, d\tau \approx \epsilon_{\text{bias}} \cdot t + \sigma \sqrt{t}$$
 
 Even a tiny $5\text{ mA}$ sensor offset produces $120\text{ mAh}$ error in 24 hours ($\approx 2.7\%$ total capacity).
 
-### 1.2 Dedicated Hardware Fuel Gauge (ModelGauge m5) vs. App Integration
+### 1.2 Dedicated Hardware Fuel Gauge (ModelGauge m5) Architecture
 The Pixel 8a features a dedicated Maxim MAX77759 fuel gauge that samples continuously at $100\text{ Hz} - 1\text{ kHz}$ across a calibrated Kelvin-connected current shunt ($5-10\text{ m}\Omega$).
-It runs a dynamic servo-mixing algorithm that continuously balances Coulomb counting during dynamic loads with Open Circuit Voltage (OCV) estimation during relaxation periods.
+It runs a dynamic servo-mixing algorithm that balances Coulomb counting during dynamic loads with Open Circuit Voltage (OCV) estimation during relaxation periods.
 
-**Architectural Rule for Charge Science:**
-Never attempt to re-integrate `CURRENT_NOW` in userspace to compute battery capacity. Always query `BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER` ($\mu\text{Ah}$), which provides the hardware-integrated value directly from the fuel gauge.
+#### `FullCapNom` vs. `FullCapRep` (Understanding `charge_full`)
+In Maxim ModelGauge m5 architectures:
+1. **`FullCapNom` (Nominal Full Capacity):** The calculated cell capacity under reference temperature ($25^\circ\text{C}$) and standardized discharge rates ($C/20$).
+2. **`FullCapRep` (Reported Full Capacity, exposed via sysfs `charge_full`):** Dynamically derated capacity taking into account the cell's current operating temperature, internal impedance growth ($R_{\text{int}}$), and recent discharge load patterns.
+
+**Crucial Scientific Distinction:**
+On a Pixel 8a with 782 cycles, reading `charge_full = 3,998 mAh` versus nominal `4,492 mAh` does **not** simply mean the battery has exactly $89\%$ State of Health. If sampled at elevated temperature ($>35^\circ\text{C}$) or after high-drain usage, `FullCapRep` shifts dynamically. Presenting the raw ratio as an immutable health metric is misleading.
+
+### 1.3 Userspace Power Integration (Trapezoidal Rule)
+Instantaneous power $P(t) = V_{\text{term}}(t) \cdot I_{\text{batt}}(t)$. Because Android system wakeups and CPU scheduling produce non-uniform sampling intervals $\Delta t_i = t_{i+1} - t_i$, taking a simple arithmetic mean of sampled power induces up to $18\%$ skew during fast-charging taper phases.
+
+Charge Science computes average session power via trapezoidal numerical integration:
+$$\bar{P} = \frac{1}{t_N - t_0} \sum_{i=0}^{N-1} \frac{P(t_i) + P(t_{i+1})}{2} \cdot (t_{i+1} - t_i)$$
+
+Total net energy delivered to the battery rail is:
+$$E_{\text{net}} = \int_{t_0}^{t_N} P(\tau) \, d\tau \approx \sum_{i=0}^{N-1} \frac{P(t_i) + P(t_{i+1})}{2} \cdot \frac{t_{i+1} - t_i}{3600} \quad [\text{Wh}]$$
 
 ---
 
@@ -76,11 +90,11 @@ $$P_{\text{loss, PMIC}} = 18\text{W} \times (1 - 0.92) = 1.44\text{W}$$
 ## 4. Session Confidence Scoring Algorithm ($S_{\text{conf}}$)
 
 To prevent presenting noisy, inaccurate capacity estimates, Charge Science computes a session confidence score:
-$$S_{\text{conf}} = 0.40 \cdot C_{\Delta \text{SOC}} + 0.25 \cdot C_{\text{thermal}} + 0.20 \cdot C_{\text{rest}} + 0.15 \cdot C_{\text{source}}$$
+$$S_{\text{conf}} = 0.40 \cdot C_{\Delta \text{SOC}} + 0.25 \cdot C_{\text{thermal}} + 0.20 \cdot C_{\text{rest}} + 0.15 \cdot C_{\text{quality}}$$
 
-- **$C_{\Delta \text{SOC}}$:** $100$ if $\Delta \text{SOC} \ge 80\%$; $0$ if $\Delta \text{SOC} \le 20\%$.
-- **$C_{\text{thermal}}$:** $\max(0, 100 - 15 \cdot \Delta T_{\text{max}} - 25 \cdot N_{\text{throttle}})$.
-- **$C_{\text{rest}}$:** $100$ if CV saturation taper was completed to $I \le C/40$; $0$ if disconnected during CC phase.
-- **$C_{\text{source}}$:** $100$ for hardware `CHARGE_COUNTER` differentials; $30$ for software polling integration.
+- **$C_{\Delta \text{SOC}}$:** $100$ if $\Delta \text{SOC} \ge 70\%$; scaled linearly from $0$ to $100$ between $10\%$ and $70\%$.
+- **$C_{\text{thermal}}$:** $\max(0, 100 - 15 \cdot \Delta T_{\text{rise}} - 20 \cdot N_{\text{throttle}})$.
+- **$C_{\text{rest}}$:** $100$ if session reached completion ($100\%$ SOC with taper); $50$ if healthy stop above $80\%$; $20$ if interrupted.
+- **$C_{\text{quality}}$:** Percentage of valid 1 Hz telemetry samples captured without sampling dropouts: $\frac{N_{\text{valid}}}{N_{\text{valid}} + N_{\text{missing}}} \times 100$.
 
-**Gating Rule:** Only sessions with $S_{\text{conf}} \ge 85\%$ are permitted to update persistent battery health metrics.
+**Gating Rule:** Only sessions with $S_{\text{conf}} \ge 80\%$ and $\Delta \text{SOC} \ge 70\%$ are qualified for deep battery health recalculation.

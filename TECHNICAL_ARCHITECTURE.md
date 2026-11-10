@@ -12,27 +12,27 @@ Charge Science implements a modern, reactive, offline-first MVVM architecture ad
                       ┌──────────────────────────────────────┐
                       │            UI Layer                  │
                       │  Jetpack Compose + M3 Expressive     │
-                      │  (Overview, Lab, Charger, Health)    │
+                      │  (Overview, Lab, Charger, Health,    │
+                      │   History & Session Detail Dialog)   │
                       └──────────────────▲───────────────────┘
                                          │ StateFlow<UiState>
                                          │
                       ┌──────────────────┴───────────────────┐
-                      │          ViewModel Layer             │
-                      │  Coroutines + State Invariant Checks │
+                      │          Session Engine              │
+                      │      ChargingSessionManager          │
+                      │  (State Machine, Interruption        │
+                      │   Recovery & Live Sample Aggregator) │
                       └──────────────────▲───────────────────┘
-                                         │ Flow<BatteryTelemetry>
                                          │
-                      ┌──────────────────┴───────────────────┐
-                      │          Repository Layer            │
-                      │  TelemetryRepository + Local Cache   │
-                      └──────────▲────────────────▲──────────┘
-                                 │                │
-            ┌────────────────────┴───┐        ┌───┴────────────────────┐
-            │   Diagnostics Engine   │        │     Storage Engine     │
-            │  BatteryManager HAL    │        │  Room DB (SQLite)      │
-            │  Thermal HAL AIDL      │        │  DataStore Preferences │
-            │  Intent Broadcasts     │        │  ChargingSessionDao    │
-            └────────────────────────┘        └────────────────────────┘
+         ┌───────────────────────────────┼───────────────────────────────┐
+         │ Flow<BatteryTelemetry>        │ Room SQLite CRUD              │
+         ▼                               ▼                               ▼
+┌────────────────────────┐   ┌────────────────────────┐   ┌────────────────────────┐
+│   Diagnostics Engine   │   │     Storage Engine     │   │   Background Engine    │
+│  BatteryManager HAL    │   │  Room 2.6+ (KSP)       │   │ ChargingTelemetryService│
+│  Thermal HAL AIDL 3    │   │  ChargingSessionDao    │   │ (FGS: specialUse,      │
+│  Sticky Intent Stream  │   │  TelemetrySampleDao    │   │  Partial WakeLock)     │
+└────────────────────────┘   └────────────────────────┘   └────────────────────────┘
 ```
 
 ---
@@ -42,22 +42,34 @@ Charge Science implements a modern, reactive, offline-first MVVM architecture ad
 ### 2.1 Diagnostics Engine (`com.example.chargescience.diagnostics`)
 - **`BatteryTelemetryCollector`:**
   - Registers sticky broadcast receiver for `Intent.ACTION_BATTERY_CHANGED`.
-  - Samples `BatteryManager` properties (`BATTERY_PROPERTY_CURRENT_NOW`, `BATTERY_PROPERTY_CHARGE_COUNTER`, `BATTERY_PROPERTY_CAPACITY`) on an adaptive interval ($1Hz$ while charging, paused or low-rate when unplugged).
-  - Listens to Android Thermal HAL via `PowerManager.addThermalStatusListener`.
+  - Samples `BatteryManager` properties (`BATTERY_PROPERTY_CURRENT_NOW`, `BATTERY_PROPERTY_CHARGE_COUNTER`, `BATTERY_PROPERTY_CAPACITY`) on an adaptive interval: $1Hz$ while charging, $3s$ when unplugged to conserve battery.
+  - Listens to Android Thermal HAL via `PowerManager.OnThermalStatusChangedListener` and `getThermalHeadroom(0)`.
   - Exposes an asynchronous `Flow<BatteryTelemetry>` with thread safety via `Dispatchers.Default`.
 
-### 2.2 Domain & Data Layer (`com.example.chargescience.data`)
-- **`TelemetryRepository`:**
-  - Merges live hardware flow with database-backed historical session tracking.
-  - Automatically detects charging session boundaries (Plugged in $\to$ Session Start, Unplugged $\to$ Session End with summary calculation).
-- **`AppDatabase` (Room SQLite):**
-  - Stores `ChargingSessionEntity` (start/end timestamp, starting/ending SoC, energy absorbed in Wh, peak wattage, thermal range, confidence score).
-  - Stores `TelemetrySampleEntity` (time-series points for session graph scrubbing).
+### 2.2 Background Telemetry Service (`ChargingTelemetryService`)
+- Operates under Android 14/15/17 compliant `foregroundServiceType="specialUse"` with `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="charging_telemetry_recording" />`.
+- Holds a `PARTIAL_WAKE_LOCK` strictly while actively charging to prevent CPU suspend when the screen goes dark, ensuring gapless 1 Hz time-series curves.
+- Posts an ongoing, silent (`IMPORTANCE_LOW`, `setOnlyAlertOnce(true)`) status bar notification displaying live wattage, voltage, current, and temperature.
+- Immediately stops foreground and releases the wake lock upon `ACTION_POWER_DISCONNECTED`.
 
-### 2.3 UI & Presentation Layer (`com.example.chargescience.ui`)
-- **Compose Navigation:**
-  - Five core routes: `Overview`, `ChargingLab`, `ChargerIntelligence`, `BatteryHealth`, `History`.
-- **Material 3 Expressive Componentry:**
-  - `HeroWattageCard` with tabular layout formatting.
-  - `TelemetryGaugeCard` with clean tonal elevation.
-  - Hardware-accelerated Canvas time-series charts.
+### 2.3 Charging Session State Machine (`com.example.chargescience.domain.session`)
+- **`ChargingSessionManager`:**
+  - Detects plug-in, charge start, charge stop, unplug, and charging method switching (e.g., AC to USB or Wireless).
+  - Handles process crashes and device reboots via `recoverInterruptedSessions()`, resolving the session end time to the timestamp of the last recorded sample.
+  - Batches and persists raw `TelemetrySampleEntity` records into Room.
+  - Computes time-weighted average power ($\int P dt / \Delta t$) using trapezoidal integration to eliminate sample-rate throttling bias.
+  - Computes the statistical Session Confidence Score ($S_{\text{conf}}$).
+
+### 2.4 Database & Persistence Layer (`com.example.chargescience.data.db`)
+- **`AppDatabase` (Room SQLite with KSP):**
+  - Configured with `room.generateKotlin = true` to generate native Kotlin bytecode.
+  - `ChargingSessionEntity`: Stores session metadata, duration, power extremes, thermal status transitions, and confidence score.
+  - `TelemetrySampleEntity`: Indexed by `sessionId` and `(sessionId, timestamp)` for high-speed time-series scrubbing.
+
+### 2.5 UI Layer (`com.example.chargescience.ui`)
+- **Five Primary Destinations:**
+  1. `Overview`: Prioritized hierarchy (Power $\to$ SOC% $\to$ Method $\to$ Temp $\to$ Voltage/Current $\to$ Negotiated Ceiling).
+  2. `Lab`: Interactive segmented selector (`Power`, `Current`, `Voltage`, `Temp`, `SOC`) with hardware-accelerated Compose Canvas time-series charts.
+  3. `History`: List of past sessions with SOC gain, duration, average power, and detailed time-series inspection dialog.
+  4. `Charger`: Protocol verification, negotiated limits, and physical boundary explanations.
+  5. `Health`: Hardware cycle counts, nominal capacity, and confidence calibration rules.
