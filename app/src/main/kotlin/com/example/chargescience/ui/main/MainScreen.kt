@@ -2,7 +2,9 @@ package com.example.chargescience.ui.main
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
@@ -11,6 +13,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Power
 import androidx.compose.material.icons.rounded.Sensors
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +32,7 @@ import com.example.chargescience.ui.health.BatteryHealthScreen
 import com.example.chargescience.ui.history.ChargingHistoryScreen
 import com.example.chargescience.ui.lab.ChargingLabScreen
 import com.example.chargescience.ui.overview.OverviewScreen
+import com.example.chargescience.ui.settings.SettingsScreen
 import com.example.chargescience.ui.wireless.WirelessDiagnosticsScreen
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -92,92 +96,105 @@ fun MainScreen(
     }
 
     var selectedDestination by remember { mutableStateOf(NavDestination.OVERVIEW) }
+    var showSettings by remember { mutableStateOf(false) }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Charge Science",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh
-                    ) {
+    if (showSettings) {
+        SettingsScreen(onBack = { showSettings = false })
+    } else {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = {
                         Text(
-                            text = if (telemetry.isCharging) "Charging • Pixel 8a" else "Battery • Pixel 8a",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (telemetry.isCharging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            text = "Charge Science",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = innerPadding.calculateTopPadding())
-        ) {
-            // Main Destination Views
-            when (selectedDestination) {
-                NavDestination.OVERVIEW -> OverviewScreen(telemetry = telemetry)
-                NavDestination.LAB -> ChargingLabScreen(
-                    telemetry = telemetry,
-                    activeSamples = liveSamples
-                )
-                NavDestination.WIRELESS -> WirelessDiagnosticsScreen(
-                    telemetry = telemetry,
-                    activeSamples = liveSamples,
-                    experiments = allExperiments,
-                    accessories = allAccessories,
-                    onSaveExperiment = { exp ->
-                        database.wirelessExperimentDao().insertExperiment(exp)
-                    }
-                )
-                NavDestination.HISTORY -> ChargingHistoryScreen(
-                    sessions = allSessions,
-                    accessories = allAccessories,
-                    onLoadSessionSamples = { sessionId ->
-                        database.telemetrySampleDao().getSamplesForSession(sessionId)
                     },
-                    onLinkAccessoryToSession = { sessionId, accessoryId ->
-                        database.chargingSessionDao().linkAccessoryToSession(sessionId, accessoryId)
-                    }
-                )
-                NavDestination.CHARGER -> ChargerIntelligenceScreen(
-                    telemetry = telemetry,
-                    accessories = allAccessories,
-                    onSaveAccessory = { accessory ->
-                        database.accessoryProfileDao().insertAccessory(accessory)
-                    }
-                )
-                NavDestination.HEALTH -> BatteryHealthScreen(
-                    telemetry = telemetry,
-                    estimates = allEstimates,
-                    sessions = allSessions
+                    actions = {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Text(
+                                text = if (telemetry.isCharging) "Charging • Pixel 8a" else "Battery • Pixel 8a",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (telemetry.isCharging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        IconButton(onClick = { showSettings = true }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
             }
-
-            // Floating Frosted Glass Navigation Pill (4 Categories Max)
-            FloatingNavPill(
-                selectedDestination = selectedDestination,
-                onSelectDestination = { selectedDestination = it },
+        ) { innerPadding ->
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
-                    .navigationBarsPadding()
-            )
+                    .fillMaxSize()
+                    .padding(top = innerPadding.calculateTopPadding())
+            ) {
+                // Main Destination Views
+                when (selectedDestination) {
+                    NavDestination.OVERVIEW -> OverviewScreen(telemetry = telemetry)
+                    NavDestination.LAB -> ChargingLabScreen(
+                        telemetry = telemetry,
+                        activeSamples = liveSamples
+                    )
+                    NavDestination.WIRELESS -> WirelessDiagnosticsScreen(
+                        telemetry = telemetry,
+                        activeSamples = liveSamples,
+                        experiments = allExperiments,
+                        accessories = allAccessories,
+                        onSaveExperiment = { exp ->
+                            database.wirelessExperimentDao().insertExperiment(exp)
+                        }
+                    )
+                    NavDestination.HISTORY -> ChargingHistoryScreen(
+                        sessions = allSessions,
+                        accessories = allAccessories,
+                        onLoadSessionSamples = { sessionId ->
+                            database.telemetrySampleDao().getSamplesForSession(sessionId)
+                        },
+                        onLinkAccessoryToSession = { sessionId, accessoryId ->
+                            database.chargingSessionDao().linkAccessoryToSession(sessionId, accessoryId)
+                        }
+                    )
+                    NavDestination.CHARGER -> ChargerIntelligenceScreen(
+                        telemetry = telemetry,
+                        accessories = allAccessories,
+                        onSaveAccessory = { accessory ->
+                            database.accessoryProfileDao().insertAccessory(accessory)
+                        }
+                    )
+                    NavDestination.HEALTH -> BatteryHealthScreen(
+                        telemetry = telemetry,
+                        estimates = allEstimates,
+                        sessions = allSessions
+                    )
+                }
+
+                // Floating Frosted Glass Navigation Pill (4 Categories Max)
+                FloatingNavPill(
+                    selectedDestination = selectedDestination,
+                    onSelectDestination = { selectedDestination = it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                        .navigationBarsPadding()
+                )
+            }
         }
     }
 }
@@ -239,7 +256,7 @@ private fun FloatingNavPill(
                 )
             }
 
-            // 4th Dynamic Companion Category
+            // 4th Dynamic Companion Category (With Circular Accent Container)
             val isDynamicSelected = selectedDestination == dynamicDestination
             NavPillItem(
                 destination = dynamicDestination,
@@ -287,18 +304,44 @@ private fun NavPillItem(
                 .padding(horizontal = 4.dp, vertical = 2.dp)
                 .animateContentSize()
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = destination.label,
-                tint = if (isSelected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else if (isDynamic) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(20.dp)
-            )
+            // Circular container inside dynamic nav button to make it visually stand out
+            if (isDynamic) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+                            },
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = destination.label,
+                        tint = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = destination.label,
+                    tint = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(20.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(2.dp))
 
@@ -310,7 +353,7 @@ private fun NavPillItem(
                 color = if (isSelected) {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else if (isDynamic) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                    MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }

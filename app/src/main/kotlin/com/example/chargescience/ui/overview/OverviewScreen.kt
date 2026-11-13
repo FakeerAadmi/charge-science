@@ -3,7 +3,6 @@ package com.example.chargescience.ui.overview
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BatteryChargingFull
@@ -15,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.chargescience.domain.prediction.ChargingPredictionEngine
@@ -25,6 +23,7 @@ import com.example.chargescience.ui.components.SegmentedPosition
 import com.example.chargescience.ui.components.SegmentedTile
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(
     telemetry: BatteryTelemetry,
@@ -62,22 +61,27 @@ fun OverviewScreen(
             } else {
                 "Discharging on internal battery"
             }
-            val powerSummary = if (telemetry.isCharging) {
-                "Direct cell absorption via MAX77759 fuel gauge"
-            } else {
-                "Active system draw from 4,492 mAh cell"
-            }
 
             SegmentedTile(
                 title = if (telemetry.isCharging) "Charging Power" else "Discharge Rate",
                 position = SegmentedPosition.TOP,
                 trailingLabel = powerLabel,
                 subtitle = powerSubtitle,
-                summary = powerSummary,
+                summary = null, // Ultra-clean: no clutter until tapped
                 icon = Icons.Rounded.ElectricBolt,
                 initialExpanded = false,
                 expandedContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = if (telemetry.isCharging) {
+                                "Direct chemical power absorbed by cell via Maxim MAX77759 fuel gauge."
+                            } else {
+                                "Real-time system power drawn from the 4,492 mAh cell."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -157,19 +161,19 @@ fun OverviewScreen(
                 position = SegmentedPosition.BOTTOM,
                 trailingLabel = "${telemetry.level}%",
                 subtitle = if (telemetry.isCharging) telemetry.chargeStateDescription else "Operating on battery",
-                summary = "Hardware coulomb-counter calibrated to nominal 4,492 mAh cell",
+                summary = null, // Ultra-clean: no clutter until tapped
                 icon = Icons.Rounded.BatteryChargingFull,
                 initialExpanded = false,
                 expandedContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "Lithium-Ion Operating Range",
+                            text = "Hardware Coulomb Counter Calibration",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Maintaining battery state between 20% and 80% mitigates chemical electrode stress and limits high-potential electrolyte oxidation.",
+                            text = "Calibrated to Pixel 8a nominal 4,492 mAh cell capacity. Keeping state between 20% and 80% prevents high-potential electrolyte oxidation and preserves long-term cycle health.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -184,46 +188,34 @@ fun OverviewScreen(
         SegmentedGroup(
             title = "Charging Forecast"
         ) {
-            // Segmented pill selector (Wired vs Wireless)
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // M3 Expressive Segmented Horizontal Button
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .padding(horizontal = 2.dp, vertical = 2.dp)
             ) {
-                Row(modifier = Modifier.padding(4.dp)) {
-                    Surface(
-                        onClick = { selectedForecastTab = 0 },
-                        shape = RoundedCornerShape(999.dp),
-                        color = if (selectedForecastTab == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp)) {
-                            Text(
-                                text = "Wired 18W USB-PD",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (selectedForecastTab == 0) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedForecastTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                SegmentedButton(
+                    selected = selectedForecastTab == 0,
+                    onClick = { selectedForecastTab = 0 },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) {
+                    Text(
+                        text = "Wired 18W USB-PD",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selectedForecastTab == 0) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
 
-                    Surface(
-                        onClick = { selectedForecastTab = 1 },
-                        shape = RoundedCornerShape(999.dp),
-                        color = if (selectedForecastTab == 1) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp)) {
-                            Text(
-                                text = "Wireless 7.5W Qi",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (selectedForecastTab == 1) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedForecastTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                SegmentedButton(
+                    selected = selectedForecastTab == 1,
+                    onClick = { selectedForecastTab = 1 },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) {
+                    Text(
+                        text = "Wireless 7.5W Qi",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selectedForecastTab == 1) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
             }
 
@@ -236,18 +228,29 @@ fun OverviewScreen(
                         title = "Time to 100% Full",
                         position = SegmentedPosition.TOP,
                         trailingLabel = currentForecast.timeToFullFormatted,
-                        subtitle = "Constant-Current / Constant-Voltage saturation model",
-                        summary = "Protective 80% threshold reached in ${currentForecast.timeTo80Formatted}",
+                        subtitle = "Constant-Current / Constant-Voltage model",
+                        summary = null, // Ultra-clean: no clutter until tapped
                         icon = Icons.Rounded.Schedule,
                         initialExpanded = false,
                         expandedContent = {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = "CC-CV Taper Phase Dynamics",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Protective 80% Threshold:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = currentForecast.timeTo80Formatted,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
                                 Text(
                                     text = if (tab == 0) {
                                         "Rapid bulk charging delivers up to 18W until 75% SOC, after which the PMIC tapers current exponentially over ~42 minutes to prevent overpotential."
@@ -262,15 +265,14 @@ fun OverviewScreen(
                     )
 
                     // Energy Consumed & Efficiency Tile (BOTTOM: squared top, curved bottom)
-                    val energySubtitle = "${currentForecast.efficiencyPercent}% end-to-end grid efficiency"
-                    val energySummary = "${String.format(Locale.US, "%.1f", currentForecast.chemicalEnergyWh)} Wh stored chemically in battery"
+                    val energySubtitle = "${currentForecast.efficiencyPercent}% grid wall efficiency"
 
                     SegmentedTile(
                         title = "Energy Required",
                         position = SegmentedPosition.BOTTOM,
                         trailingLabel = String.format(Locale.US, "%.1f Wh", currentForecast.wallEnergyWh),
                         subtitle = energySubtitle,
-                        summary = energySummary,
+                        summary = null, // Ultra-clean: no clutter until tapped
                         icon = Icons.Rounded.Speed,
                         initialExpanded = false,
                         expandedContent = {
@@ -287,8 +289,16 @@ fun OverviewScreen(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
+                                    Column {
+                                        Text("CHEMICAL STORED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                        Text(
+                                            text = String.format(Locale.US, "%.1f Wh", currentForecast.chemicalEnergyWh),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                     Column(horizontalAlignment = Alignment.End) {
-                                        Text("PEAK INPUT RATING", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                        Text("PEAK RATING", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                         Text(
                                             text = String.format(Locale.US, "%.1f W", currentForecast.peakPowerWatts),
                                             style = MaterialTheme.typography.titleMedium,
@@ -298,7 +308,7 @@ fun OverviewScreen(
                                 }
 
                                 if (tab == 1 && chargingForecast.energyOverheadPercent > 0) {
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = "Wireless charging consumes +${chargingForecast.energyOverheadPercent}% more grid energy and takes ~${chargingForecast.timeDifferenceMinutes}m longer due to inductive magnetic field losses and coil heating.",
                                         style = MaterialTheme.typography.bodyMedium,
@@ -323,20 +333,31 @@ fun OverviewScreen(
                 title = "Active Screen-On Time",
                 position = SegmentedPosition.TOP,
                 trailingLabel = enduranceForecast.activeMixedSotFormatted,
-                subtitle = "120Hz Actua OLED display mixed daily use",
-                summary = "Standby sleep: ${enduranceForecast.standbyFormatted} (Screen-off Doze)",
+                subtitle = "120Hz Actua display mixed daily use",
+                summary = null, // Ultra-clean: no clutter until tapped
                 icon = Icons.Rounded.Schedule,
                 initialExpanded = false,
                 expandedContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Standby Sleep (Screen-off Doze):",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = enduranceForecast.standbyFormatted,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
                         Text(
-                            text = "Display & Platform Power Context",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Based on Google Tensor G3 baseline power profiles. Screen draw on the 120Hz LTPO display scales with ambient brightness and refresh rate.",
+                            text = "Based on Google Tensor G3 baseline power profiles. Screen draw on the 120Hz LTPO display scales dynamically with ambient brightness and refresh rate.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -350,7 +371,7 @@ fun OverviewScreen(
                 position = SegmentedPosition.BOTTOM,
                 trailingLabel = "3 Modes",
                 subtitle = "Reading, Video Streaming & Intensive Load",
-                summary = "Reading: ${enduranceForecast.lightSotFormatted} • Video: ${enduranceForecast.videoPlaybackFormatted}",
+                summary = null, // Ultra-clean: no clutter until tapped
                 icon = Icons.Rounded.Speed,
                 initialExpanded = false,
                 expandedContent = {
@@ -425,7 +446,7 @@ fun OverviewScreen(
                 position = SegmentedPosition.SINGLE,
                 trailingLabel = contractTitle,
                 subtitle = contractSubtitle,
-                summary = if (telemetry.isCharging) "Power profile negotiated with Pixel 8a PMIC" else "Device running from internal battery reserve",
+                summary = null, // Ultra-clean: no clutter until tapped
                 icon = Icons.Rounded.Power,
                 initialExpanded = false,
                 expandedContent = {
