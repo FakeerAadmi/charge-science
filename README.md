@@ -19,6 +19,8 @@ Unlike consumer battery utilities that display speculative calculations, animate
    - Charging profile detection: Negotiated max voltage, max current, and power ceiling.
    - Real-time battery temperature, millivolt terminal voltage, and milliampere current flow.
    - Charging state and connection type (USB-PD, Standard AC, USB, Qi Wireless).
+   - **Predictive Charging Forecasts**: Rigorous non-linear CC-CV constant-current/constant-voltage saturation curves predicting time to 80% and 100%, stored chemical energy ($Wh$), grid wall energy consumed ($Wh$), and end-to-end grid efficiency comparison between **18W USB-PD Wired** ($\eta \approx 82\%$) and **7.5W Qi Wireless** ($\eta \approx 60\%$, $+37\%$ grid energy overhead).
+   - **Battery Endurance & Screen-On Time (SOT)**: Multi-scenario discharge projections modeled on Pixel 8a 120Hz Actua display & Tensor G3 power draw (Active Mixed SOT, Light Reading/60Hz, Intensive 3D/5G, 1080p Video, and Screen-off Doze Standby).
 
 2. **Charging Lab**
    - High-frequency time-series curves for power ($W$), voltage ($V$), and current ($A$).

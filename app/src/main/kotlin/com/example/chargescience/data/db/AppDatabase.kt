@@ -99,7 +99,7 @@ abstract class AppDatabase : RoomDatabase() {
                         diagnosticOutcome TEXT,
                         confidenceScore REAL NOT NULL,
                         userNotes TEXT,
-                        FOREIGN KEY(accessoryId) REFERENCES accessory_profiles(id) ON UPDATE NO ACTION ON DELETE SET_NULL
+                        FOREIGN KEY(accessoryId) REFERENCES accessory_profiles(id) ON UPDATE NO ACTION ON DELETE SET NULL
                     )
                     """.trimIndent()
                 )

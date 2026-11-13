@@ -7,10 +7,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.chargescience.domain.prediction.ChargingPredictionEngine
 import com.example.chargescience.model.BatteryTelemetry
+import com.example.chargescience.ui.components.ChargeForecastCard
+import com.example.chargescience.ui.components.EnduranceForecastCard
 import com.example.chargescience.ui.components.HeroWattageCard
 import com.example.chargescience.ui.components.TelemetryGaugeCard
 import java.util.Locale
@@ -21,6 +25,16 @@ fun OverviewScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val predictionEngine = remember { ChargingPredictionEngine() }
+
+    val chargingForecast = remember(telemetry.level) {
+        predictionEngine.predictCharging(telemetry.level)
+    }
+
+    val enduranceForecast = remember(telemetry.level, telemetry.currentMa) {
+        val drain = if (telemetry.currentMa < 0) -telemetry.currentMa else 0
+        predictionEngine.predictEndurance(telemetry.level, liveDrainMa = drain)
+    }
 
     Column(
         modifier = modifier
@@ -109,6 +123,31 @@ fun OverviewScreen(
                     )
                 }
             }
+        }
+
+        // Predictive Charging Time/Energy & Battery Endurance Forecasting
+        if (telemetry.isCharging) {
+            ChargeForecastCard(
+                currentSoc = telemetry.level,
+                forecast = chargingForecast,
+                isCurrentlyCharging = telemetry.isCharging,
+                isCurrentlyWireless = telemetry.pluggedSource == 4
+            )
+            EnduranceForecastCard(
+                currentSoc = telemetry.level,
+                forecast = enduranceForecast
+            )
+        } else {
+            EnduranceForecastCard(
+                currentSoc = telemetry.level,
+                forecast = enduranceForecast
+            )
+            ChargeForecastCard(
+                currentSoc = telemetry.level,
+                forecast = chargingForecast,
+                isCurrentlyCharging = telemetry.isCharging,
+                isCurrentlyWireless = false
+            )
         }
 
         // Priority 4 & 5: Electrical & Thermal Quad Telemetry
