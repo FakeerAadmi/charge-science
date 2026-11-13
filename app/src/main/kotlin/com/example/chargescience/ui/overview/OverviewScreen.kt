@@ -1,7 +1,6 @@
 package com.example.chargescience.ui.overview
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import com.example.chargescience.domain.prediction.ChargingPredictionEngine
 import com.example.chargescience.model.BatteryTelemetry
 import com.example.chargescience.ui.components.SegmentedGroup
+import com.example.chargescience.ui.components.SegmentedPosition
 import com.example.chargescience.ui.components.SegmentedTile
 import java.util.Locale
-import kotlin.math.abs
 
 @Composable
 fun OverviewScreen(
@@ -46,7 +45,7 @@ fun OverviewScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
@@ -56,7 +55,7 @@ fun OverviewScreen(
         SegmentedGroup(
             title = "Live Diagnostics"
         ) {
-            // Net Battery Power Tile
+            // Net Battery Power Tile (TOP: curved top, squared bottom)
             val powerLabel = String.format(Locale.US, "%.1f W", telemetry.wattage)
             val powerSubtitle = if (telemetry.isCharging) {
                 "Charging • ${telemetry.protocolName}"
@@ -71,13 +70,14 @@ fun OverviewScreen(
 
             SegmentedTile(
                 title = if (telemetry.isCharging) "Charging Power" else "Discharge Rate",
+                position = SegmentedPosition.TOP,
                 trailingLabel = powerLabel,
                 subtitle = powerSubtitle,
                 summary = powerSummary,
                 icon = Icons.Rounded.ElectricBolt,
                 initialExpanded = false,
                 expandedContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -115,7 +115,7 @@ fun OverviewScreen(
                         HorizontalDivider(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
                             thickness = 0.5.dp,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            modifier = Modifier.padding(vertical = 2.dp)
                         )
 
                         Row(
@@ -151,9 +151,10 @@ fun OverviewScreen(
                 }
             )
 
-            // State of Charge Tile
+            // State of Charge Tile (BOTTOM: squared top, curved bottom)
             SegmentedTile(
                 title = "State of Charge",
+                position = SegmentedPosition.BOTTOM,
                 trailingLabel = "${telemetry.level}%",
                 subtitle = if (telemetry.isCharging) telemetry.chargeStateDescription else "Operating on battery",
                 summary = "Hardware coulomb-counter calibrated to nominal 4,492 mAh cell",
@@ -169,7 +170,7 @@ fun OverviewScreen(
                         )
                         Text(
                             text = "Maintaining battery state between 20% and 80% mitigates chemical electrode stress and limits high-potential electrolyte oxidation.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -185,14 +186,16 @@ fun OverviewScreen(
         ) {
             // Segmented pill selector (Wired vs Wireless)
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(999.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
                 Row(modifier = Modifier.padding(4.dp)) {
                     Surface(
                         onClick = { selectedForecastTab = 0 },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(999.dp),
                         color = if (selectedForecastTab == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
                         modifier = Modifier.weight(1f)
                     ) {
@@ -208,7 +211,7 @@ fun OverviewScreen(
 
                     Surface(
                         onClick = { selectedForecastTab = 1 },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(999.dp),
                         color = if (selectedForecastTab == 1) MaterialTheme.colorScheme.surface else Color.Transparent,
                         modifier = Modifier.weight(1f)
                     ) {
@@ -227,10 +230,11 @@ fun OverviewScreen(
             Crossfade(targetState = selectedForecastTab, label = "ForecastPillCrossfade") { tab ->
                 val currentForecast = if (tab == 0) chargingForecast.wired else chargingForecast.wireless
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Time to Full Tile
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Time to Full Tile (TOP: curved top, squared bottom)
                     SegmentedTile(
                         title = "Time to 100% Full",
+                        position = SegmentedPosition.TOP,
                         trailingLabel = currentForecast.timeToFullFormatted,
                         subtitle = "Constant-Current / Constant-Voltage saturation model",
                         summary = "Protective 80% threshold reached in ${currentForecast.timeTo80Formatted}",
@@ -250,19 +254,20 @@ fun OverviewScreen(
                                     } else {
                                         "Wireless charging is hardware-capped at 7.5W RF input (net cell chemical power ~4.6W). Taper knee begins at ~85% SOC."
                                     },
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     )
 
-                    // Energy Consumed & Efficiency Tile
+                    // Energy Consumed & Efficiency Tile (BOTTOM: squared top, curved bottom)
                     val energySubtitle = "${currentForecast.efficiencyPercent}% end-to-end grid efficiency"
                     val energySummary = "${String.format(Locale.US, "%.1f", currentForecast.chemicalEnergyWh)} Wh stored chemically in battery"
 
                     SegmentedTile(
                         title = "Energy Required",
+                        position = SegmentedPosition.BOTTOM,
                         trailingLabel = String.format(Locale.US, "%.1f Wh", currentForecast.wallEnergyWh),
                         subtitle = energySubtitle,
                         summary = energySummary,
@@ -293,10 +298,10 @@ fun OverviewScreen(
                                 }
 
                                 if (tab == 1 && chargingForecast.energyOverheadPercent > 0) {
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = "Wireless charging consumes +${chargingForecast.energyOverheadPercent}% more grid energy and takes ~${chargingForecast.timeDifferenceMinutes}m longer due to inductive magnetic field losses and coil heating.",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.tertiary
                                     )
                                 }
@@ -313,9 +318,10 @@ fun OverviewScreen(
         SegmentedGroup(
             title = "Battery Endurance"
         ) {
-            // Active Screen-On Time Tile
+            // Active Screen-On Time Tile (TOP: curved top, squared bottom)
             SegmentedTile(
                 title = "Active Screen-On Time",
+                position = SegmentedPosition.TOP,
                 trailingLabel = enduranceForecast.activeMixedSotFormatted,
                 subtitle = "120Hz Actua OLED display mixed daily use",
                 summary = "Standby sleep: ${enduranceForecast.standbyFormatted} (Screen-off Doze)",
@@ -331,16 +337,17 @@ fun OverviewScreen(
                         )
                         Text(
                             text = "Based on Google Tensor G3 baseline power profiles. Screen draw on the 120Hz LTPO display scales with ambient brightness and refresh rate.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             )
 
-            // Usage Scenarios Tile
+            // Usage Scenarios Tile (BOTTOM: squared top, curved bottom)
             SegmentedTile(
                 title = "Workload Projections",
+                position = SegmentedPosition.BOTTOM,
                 trailingLabel = "3 Modes",
                 subtitle = "Reading, Video Streaming & Intensive Load",
                 summary = "Reading: ${enduranceForecast.lightSotFormatted} • Video: ${enduranceForecast.videoPlaybackFormatted}",
@@ -415,6 +422,7 @@ fun OverviewScreen(
 
             SegmentedTile(
                 title = "Negotiated Contract",
+                position = SegmentedPosition.SINGLE,
                 trailingLabel = contractTitle,
                 subtitle = contractSubtitle,
                 summary = if (telemetry.isCharging) "Power profile negotiated with Pixel 8a PMIC" else "Device running from internal battery reserve",
@@ -430,7 +438,7 @@ fun OverviewScreen(
                         )
                         Text(
                             text = "The advertised contract defines the electrical ceiling supplied over the USB-C bus or Qi field. Actual power absorbed by the battery is modulated by the charging stage and thermal throttling governor.",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -438,6 +446,7 @@ fun OverviewScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Bottom spacer to ensure scrolling content is never obstructed by the floating navigation pill
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }

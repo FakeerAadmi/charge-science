@@ -1,8 +1,9 @@
 package com.example.chargescience.ui.main
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.ElectricBolt
@@ -12,13 +13,14 @@ import androidx.compose.material.icons.rounded.Power
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.chargescience.data.db.AppDatabase
-import com.example.chargescience.data.db.entity.ChargingSessionEntity
-import com.example.chargescience.data.db.entity.TelemetrySampleEntity
 import com.example.chargescience.diagnostics.BatteryTelemetryCollector
 import com.example.chargescience.diagnostics.ChargingTelemetryService
 import com.example.chargescience.domain.session.ChargingSessionManager
@@ -33,9 +35,9 @@ import kotlinx.coroutines.flow.emptyFlow
 enum class NavDestination(val label: String) {
     OVERVIEW("Overview"),
     LAB("Lab"),
-    WIRELESS("Wireless"),
-    CHARGER("Charger"),
     HISTORY("History"),
+    CHARGER("Charger"),
+    WIRELESS("Wireless"),
     HEALTH("Health")
 }
 
@@ -98,19 +100,21 @@ fun MainScreen(
                 title = {
                     Text(
                         text = "Charge Science",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
                 },
                 actions = {
                     Surface(
-                        shape = MaterialTheme.shapes.extraSmall,
+                        shape = RoundedCornerShape(999.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh
                     ) {
                         Text(
                             text = if (telemetry.isCharging) "Charging • Pixel 8a" else "Battery • Pixel 8a",
                             style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = if (telemetry.isCharging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
                 },
@@ -118,45 +122,14 @@ fun MainScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ) {
-                NavDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = selectedDestination == destination,
-                        onClick = { selectedDestination = destination },
-                        label = {
-                            Text(
-                                text = destination.label,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        },
-                        icon = {
-                            val icon = when (destination) {
-                                NavDestination.OVERVIEW -> Icons.Rounded.ElectricBolt
-                                NavDestination.LAB -> Icons.AutoMirrored.Rounded.ShowChart
-                                NavDestination.WIRELESS -> Icons.Rounded.Sensors
-                                NavDestination.CHARGER -> Icons.Rounded.Power
-                                NavDestination.HISTORY -> Icons.Rounded.History
-                                NavDestination.HEALTH -> Icons.Rounded.Favorite
-                            }
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = destination.label
-                            )
-                        }
-                    )
-                }
-            }
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = innerPadding.calculateTopPadding())
         ) {
+            // Main Destination Views
             when (selectedDestination) {
                 NavDestination.OVERVIEW -> OverviewScreen(telemetry = telemetry)
                 NavDestination.LAB -> ChargingLabScreen(
@@ -195,6 +168,153 @@ fun MainScreen(
                     sessions = allSessions
                 )
             }
+
+            // Floating Frosted Glass Navigation Pill (4 Categories Max)
+            FloatingNavPill(
+                selectedDestination = selectedDestination,
+                onSelectDestination = { selectedDestination = it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .navigationBarsPadding()
+            )
+        }
+    }
+}
+
+/**
+ * Floating Navigation Pill with frosted glass appearance.
+ * Features 3 core anchor categories + 1 dynamic companion category.
+ */
+@Composable
+private fun FloatingNavPill(
+    selectedDestination: NavDestination,
+    onSelectDestination: (NavDestination) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Determine active anchor context
+    val currentAnchor = when (selectedDestination) {
+        NavDestination.OVERVIEW, NavDestination.CHARGER -> NavDestination.OVERVIEW
+        NavDestination.LAB, NavDestination.WIRELESS -> NavDestination.LAB
+        NavDestination.HISTORY, NavDestination.HEALTH -> NavDestination.HISTORY
+    }
+
+    // Dynamic 4th category derived from active anchor
+    val dynamicDestination = when (currentAnchor) {
+        NavDestination.OVERVIEW -> NavDestination.CHARGER
+        NavDestination.LAB -> NavDestination.WIRELESS
+        NavDestination.HISTORY -> NavDestination.HEALTH
+        else -> NavDestination.CHARGER
+    }
+
+    val primaryAnchors = listOf(
+        NavDestination.OVERVIEW,
+        NavDestination.LAB,
+        NavDestination.HISTORY
+    )
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        shadowElevation = 10.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .height(56.dp)
+                .fillMaxWidth(0.96f),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 3 Fixed Primary Anchors
+            primaryAnchors.forEach { dest ->
+                val isSelected = selectedDestination == dest
+                NavPillItem(
+                    destination = dest,
+                    isSelected = isSelected,
+                    onClick = { onSelectDestination(dest) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // 4th Dynamic Companion Category
+            val isDynamicSelected = selectedDestination == dynamicDestination
+            NavPillItem(
+                destination = dynamicDestination,
+                isSelected = isDynamicSelected,
+                isDynamic = true,
+                onClick = { onSelectDestination(dynamicDestination) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NavPillItem(
+    destination: NavDestination,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isDynamic: Boolean = false
+) {
+    val icon = when (destination) {
+        NavDestination.OVERVIEW -> Icons.Rounded.ElectricBolt
+        NavDestination.LAB -> Icons.AutoMirrored.Rounded.ShowChart
+        NavDestination.WIRELESS -> Icons.Rounded.Sensors
+        NavDestination.CHARGER -> Icons.Rounded.Power
+        NavDestination.HISTORY -> Icons.Rounded.History
+        NavDestination.HEALTH -> Icons.Rounded.Favorite
+    }
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(999.dp),
+        color = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            Color.Transparent
+        },
+        modifier = modifier.fillMaxHeight()
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .animateContentSize()
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = destination.label,
+                tint = if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else if (isDynamic) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(20.dp)
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = destination.label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else if (isDynamic) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
     }
 }
