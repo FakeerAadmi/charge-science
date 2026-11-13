@@ -8,16 +8,9 @@ import kotlin.math.abs
 
 class ChargingPredictionEngineTest {
 
-    private lateinit var engine: ChargingPredictionEngine
-
-    @Before
-    fun setUp() {
-        engine = ChargingPredictionEngine()
-    }
-
     @Test
     fun testWiredVsWirelessPredictionAtLowSoc() {
-        val forecast = engine.predictCharging(currentSoc = 20)
+        val forecast = ChargingPredictionEngine.predictCharging(currentSoc = 20)
 
         // At 20% SOC: Wired full charge is ~60-70 mins; Wireless is ~170-200 mins
         assertTrue("Wired should be faster than wireless", forecast.wired.timeToFullMinutes < forecast.wireless.timeToFullMinutes)
@@ -39,7 +32,7 @@ class ChargingPredictionEngineTest {
 
     @Test
     fun testFullyChargedBatteryReturnsZero() {
-        val forecast = engine.predictCharging(currentSoc = 100)
+        val forecast = ChargingPredictionEngine.predictCharging(currentSoc = 100)
 
         assertEquals(0, forecast.wired.timeToFullMinutes)
         assertEquals(0, forecast.wired.timeTo80Minutes)
@@ -53,7 +46,7 @@ class ChargingPredictionEngineTest {
     @Test
     fun testTaperPhaseAtHighSoc() {
         // At 85% SOC: battery is already past 80%
-        val forecast = engine.predictCharging(currentSoc = 85)
+        val forecast = ChargingPredictionEngine.predictCharging(currentSoc = 85)
 
         assertEquals(0, forecast.wired.timeTo80Minutes)
         assertEquals(0, forecast.wireless.timeTo80Minutes)
@@ -65,7 +58,7 @@ class ChargingPredictionEngineTest {
 
     @Test
     fun testEnduranceForecastingAtFullCharge() {
-        val endurance = engine.predictEndurance(currentSoc = 100, usableCapacityMah = 4492)
+        val endurance = ChargingPredictionEngine.predictEndurance(currentSoc = 100, usableCapacityMah = 4492)
 
         // SOT mixed (480mA) = 4492 / 480 * 60 ≈ 561 min (9h 21m)
         assertTrue(abs(561 - endurance.activeMixedSotMinutes) <= 5)
@@ -86,8 +79,8 @@ class ChargingPredictionEngineTest {
 
     @Test
     fun testEnduranceForecastingScalesWithSoc() {
-        val full = engine.predictEndurance(currentSoc = 100)
-        val half = engine.predictEndurance(currentSoc = 50)
+        val full = ChargingPredictionEngine.predictEndurance(currentSoc = 100)
+        val half = ChargingPredictionEngine.predictEndurance(currentSoc = 50)
 
         // Half SOC should provide approximately half the minutes
         assertTrue(abs(full.activeMixedSotMinutes / 2 - half.activeMixedSotMinutes) <= 2)

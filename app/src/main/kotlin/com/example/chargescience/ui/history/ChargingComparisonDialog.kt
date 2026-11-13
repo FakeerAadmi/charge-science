@@ -5,6 +5,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -67,7 +72,7 @@ fun ChargingComparisonDialog(
                     }
 
                     TextButton(onClick = onDismiss) {
-                        Text("✕", style = MaterialTheme.typography.titleMedium)
+                        Icon(Icons.Rounded.Close, contentDescription = "Close")
                     }
                 }
 
@@ -216,10 +221,10 @@ private fun ValidityBanner(result: SessionComparisonResult) {
         ComparisonValidity.COMPARABLE_WITH_CAVEATS -> MaterialTheme.colorScheme.onSecondaryContainer
         ComparisonValidity.UNCONTROLLED_MISLEADING -> MaterialTheme.colorScheme.onErrorContainer
     }
-    val badgeSymbol = when (result.validity) {
-        ComparisonValidity.HIGH_FIDELITY_CONTROLLED -> "✓"
-        ComparisonValidity.COMPARABLE_WITH_CAVEATS -> "ℹ"
-        ComparisonValidity.UNCONTROLLED_MISLEADING -> "⚠"
+    val badgeIcon = when (result.validity) {
+        ComparisonValidity.HIGH_FIDELITY_CONTROLLED -> Icons.Rounded.CheckCircle
+        ComparisonValidity.COMPARABLE_WITH_CAVEATS -> Icons.Rounded.Info
+        ComparisonValidity.UNCONTROLLED_MISLEADING -> Icons.Rounded.Warning
     }
     val title = when (result.validity) {
         ComparisonValidity.HIGH_FIDELITY_CONTROLLED -> "HIGH-FIDELITY CONTROLLED COMPARISON"
@@ -234,7 +239,12 @@ private fun ValidityBanner(result: SessionComparisonResult) {
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = badgeSymbol, style = MaterialTheme.typography.titleMedium, color = contentColor)
+                Icon(
+                    imageVector = badgeIcon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(20.dp)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = title, style = MaterialTheme.typography.labelMedium, color = contentColor)
             }

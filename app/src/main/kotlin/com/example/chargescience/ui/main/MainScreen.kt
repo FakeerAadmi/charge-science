@@ -3,6 +3,13 @@ package com.example.chargescience.ui.main
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
+import androidx.compose.material.icons.rounded.ElectricBolt
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Power
+import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -127,22 +134,17 @@ fun MainScreen(
                             )
                         },
                         icon = {
-                            val symbol = when (destination) {
-                                NavDestination.OVERVIEW -> "⚡"
-                                NavDestination.LAB -> "📈"
-                                NavDestination.WIRELESS -> "◎"
-                                NavDestination.CHARGER -> "🔌"
-                                NavDestination.HISTORY -> "⏱"
-                                NavDestination.HEALTH -> "♥"
+                            val icon = when (destination) {
+                                NavDestination.OVERVIEW -> Icons.Rounded.ElectricBolt
+                                NavDestination.LAB -> Icons.AutoMirrored.Rounded.ShowChart
+                                NavDestination.WIRELESS -> Icons.Rounded.Sensors
+                                NavDestination.CHARGER -> Icons.Rounded.Power
+                                NavDestination.HISTORY -> Icons.Rounded.History
+                                NavDestination.HEALTH -> Icons.Rounded.Favorite
                             }
-                            Text(
-                                text = symbol,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (selectedDestination == destination) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = destination.label
                             )
                         }
                     )

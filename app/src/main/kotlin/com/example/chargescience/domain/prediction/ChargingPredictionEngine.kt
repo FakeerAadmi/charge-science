@@ -36,29 +36,27 @@ data class EnduranceForecast(
     val standbyFormatted: String
 )
 
-class ChargingPredictionEngine {
+object ChargingPredictionEngine {
 
-    companion object {
-        const val NOMINAL_CAPACITY_MAH = 4492
-        const val NOMINAL_VOLTAGE_V = 3.88f
-        const val TOTAL_BATTERY_ENERGY_WH = (NOMINAL_CAPACITY_MAH / 1000f) * NOMINAL_VOLTAGE_V // ≈ 17.43 Wh
+    const val NOMINAL_CAPACITY_MAH = 4492
+    const val NOMINAL_VOLTAGE_V = 3.88f
+    const val TOTAL_BATTERY_ENERGY_WH = (NOMINAL_CAPACITY_MAH / 1000f) * NOMINAL_VOLTAGE_V // ≈ 17.43 Wh
 
-        // Power & Efficiency Constants
-        const val WIRED_PEAK_POWER_WATTS = 18.0f
-        const val WIRED_AVG_CC_POWER_WATTS = 15.0f
-        const val WIRED_END_TO_END_EFFICIENCY = 0.82f // 82% (adapter + buck converter)
+    // Power & Efficiency Constants
+    const val WIRED_PEAK_POWER_WATTS = 18.0f
+    const val WIRED_AVG_CC_POWER_WATTS = 15.0f
+    const val WIRED_END_TO_END_EFFICIENCY = 0.82f // 82% (adapter + buck converter)
 
-        const val WIRELESS_PEAK_POWER_WATTS = 7.5f
-        const val WIRELESS_AVG_CC_POWER_WATTS = 4.5f
-        const val WIRELESS_END_TO_END_EFFICIENCY = 0.60f // 60% (induction coil + rectifier + adapter)
+    const val WIRELESS_PEAK_POWER_WATTS = 7.5f
+    const val WIRELESS_AVG_CC_POWER_WATTS = 4.5f
+    const val WIRELESS_END_TO_END_EFFICIENCY = 0.60f // 60% (induction coil + rectifier + adapter)
 
-        // Pixel 8a Discharge Current Profiles (mA)
-        const val DRAIN_ACTIVE_MIXED_MA = 480  // Mixed 120Hz display, social/browser/apps
-        const val DRAIN_LIGHT_READING_MA = 350 // 60Hz text reading, Wi-Fi, low brightness
-        const val DRAIN_HEAVY_INTENSIVE_MA = 850 // 3D gaming, 4K camera, high 5G load
-        const val DRAIN_VIDEO_PLAYBACK_MA = 380 // 1080p video streaming
-        const val DRAIN_STANDBY_MA = 18        // Screen-off Doze standby
-    }
+    // Pixel 8a Discharge Current Profiles (mA)
+    const val DRAIN_ACTIVE_MIXED_MA = 480  // Mixed 120Hz display, social/browser/apps
+    const val DRAIN_LIGHT_READING_MA = 350 // 60Hz text reading, Wi-Fi, low brightness
+    const val DRAIN_HEAVY_INTENSIVE_MA = 850 // 3D gaming, 4K camera, high 5G load
+    const val DRAIN_VIDEO_PLAYBACK_MA = 380 // 1080p video streaming
+    const val DRAIN_STANDBY_MA = 18        // Screen-off Doze standby
 
     /**
      * Calculates non-linear CC-CV charging time and grid energy consumption

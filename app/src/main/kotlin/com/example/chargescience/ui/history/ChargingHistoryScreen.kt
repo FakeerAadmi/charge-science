@@ -10,6 +10,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ElectricBolt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,9 +74,11 @@ fun ChargingHistoryScreen(
                     modifier = Modifier.size(72.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "⚡",
-                            style = MaterialTheme.typography.headlineLarge
+                        Icon(
+                            imageVector = Icons.Rounded.ElectricBolt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                 }
@@ -456,7 +462,7 @@ private fun SessionDetailDialog(
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         TextButton(onClick = onDismiss) {
-                            Text("✕", style = MaterialTheme.typography.titleMedium)
+                            Icon(Icons.Rounded.Close, contentDescription = "Close")
                         }
                     }
                 }
@@ -622,7 +628,7 @@ private fun SessionDetailDialog(
                                         Text(text = "${acc.type} • ${acc.claimedWattage}W", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     if (session.accessoryId == acc.id) {
-                                        Text("✓", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
